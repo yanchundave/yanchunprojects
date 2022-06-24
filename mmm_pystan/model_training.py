@@ -10,15 +10,9 @@ import pandas as pd
 import pickle 
 import nest_asyncio
 import time
+from global_variable import *
 
 nest_asyncio.apply()
-
-datafile_path = "/Users/yanchunyang/Documents/datafiles/pystan/"
-L = 14  #carryover period
-T = 7   #moving average period
-Kb = 7
-Km = 11
-M = 148
 
 
 def read_dataset():
@@ -97,11 +91,11 @@ def train_model(model_file):
         model_description = f.read()
 
     stan_data = {
-        "L": 14,
-        "M" : 148,
-        "N": 148,
-        "Kb": 7,
-        "Km": 11,
+        "L": L,
+        "M" : Kl,
+        "N": Kl,
+        "Kb": T,
+        "Km": Km,
         "x_b": x_basic,
         "x_m": x_spending,
         "y": y_moving_train

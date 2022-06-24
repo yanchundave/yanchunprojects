@@ -68,11 +68,15 @@ def main(argv):
         plot_distribution(df_parameter)
 
     elif argv == 'draw_origin_spending':
-        draw_origin_spending()
+        draw_origin_spending(spending_origin)
 
-    elif argv == 'actual_all_data_saturation':  # draw saturation graph based on the actual spending
+    elif argv == 'actual_all_data_saturation':  # draw saturation graph bachsed on the actual spending
         results, spending_list, current_spending = actual_all_data_saturation(spending_origin, df_parameter)
         draw_all_data_saturation(results, spending_list, current_spending)
+
+    elif argv == 'platform_data_saturation':  # draw saturation graph bachsed on the actual spending
+        results, spending_list, current_spending = actual_all_data_saturation(spending_origin, df_parameter)
+        draw_platform_data_saturation(results, spending_list, current_spending)
 
     elif argv == 'actual_data_saturation': # saturation graph for each platform
         results, spending_list, current_spending = actual_data_saturation(spending_origin, df_parameter)
@@ -83,10 +87,14 @@ def main(argv):
 
     elif 'channel_contribution' in argv:
         splits = argv.strip().split(" ")
-        calculate_prediction_and_prediction_removed(df_parameter, splits[-1])
+        total, contribution = calculate_prediction_and_prediction_removed(df_parameter, splits[-1])
+        draw_contribution(total, contribution)
        
     elif argv == 'channel_information':
         draw_channel_information(df_parameter, spending_origin)
+    
+    elif argv == 'decay_effect':
+        draw_decay_effect(df_parameter)
 
     else:
         print("The function you input is not in the function list")

@@ -1,6 +1,8 @@
 """This is data clean and scale code snippet. It is before training part.
 
 The input data are daily spending data for each channel and new daily PV users.
+
+Remember to update global_variables and also response_file
 """
 
 
@@ -10,13 +12,7 @@ from datetime import datetime, timedelta
 from sklearn.preprocessing import MinMaxScaler
 import pickle 
 import math
-
-#flag = 1 # user
-flag = 0 # revenue
-#response_file = "platform_user.csv"
-response_file = "total_revenue.csv"
-#response_file = "platform_user_advance.csv"
-independent_file = "channel_spending_raw.csv"
+from global_variable import *
 
 
 def stack_columns(df, column_list, column_name):
@@ -57,13 +53,10 @@ def clean_spending_update(df):
     dfupdate = df.loc[:, column_name_update]
     return dfupdate
 
-def normalize_y(pv, flag):
-    if flag == 1:
-        return np.log(pv / 1000 + 1)
-    else:
-        return np.log(pv / 100000)
-
-def combine_x_y(spending_pv, df_pv, flag):
+def normalize_y(pv):
+    return np.log(pv / y_constant + 1)
+   
+def combine_x_y(spending_pv, df_pv):
     '''
     Returns dataframe combine spending with pv after MinMaxScaler.
 
@@ -80,7 +73,7 @@ def combine_x_y(spending_pv, df_pv, flag):
     scaler = MinMaxScaler()
     df_spending = clean_spending_update(spending_pv)
     spending_column = [x for x in df_spending.columns if ('Android' in x) or ('iOS' in x)] + ['unknown', 'TV']
-    df_pv['y'] = normalize_y(df_pv['PV'], flag)    # scale new users by actual new user divided by 1000 and get its log.
+    df_pv['y'] = normalize_y(df_pv['PV'])    # scale new users by actual new user divided by 1000 and get its log.
     df_combine = pd.merge(df_spending, df_pv, on=['date'], how='inner')
     df_combine = df_combine.sort_values(by=['datenumber'], ascending=True)
     df_combine['trend'] = np.log(df_combine.index + 1)
@@ -121,19 +114,18 @@ def data_input():
     Clip the outliers and limit the y within 1.5 and 2.4 after investigation.
     Dump the scaled spending, pv, origin_spending to pickle files for model training and analysis.
     '''
-
-    datafile_path = "/Users/yanchunyang/Documents/datafiles/"
+    
     pv_daily = response_file
     spending_daily = independent_file
     df_pv = pd.read_csv(datafile_path + pv_daily)
     spending_pv = pd.read_csv(datafile_path + spending_daily)
-    spending, basic, y, spending_origin = combine_x_y(spending_pv, df_pv, flag)
+    spending, basic, y, spending_origin = combine_x_y(spending_pv, df_pv)
     lowerlimit, upper_limit = obtain_limits(y)
     y = np.clip(y, lowerlimit, upper_limit)
-    pickle_dump(spending, datafile_path + "pystan/spending.p")
-    pickle_dump(basic, datafile_path + "pystan/basic.p")
-    pickle_dump(y, datafile_path + "pystan/newuser.p")
-    pickle_dump(spending_origin, datafile_path + "pystan/spending_origin.p")
+    pickle_dump(spending, datafile_path + "spending.p")
+    pickle_dump(basic, datafile_path + "basic.p")
+    pickle_dump(y, datafile_path + "newuser.p")
+    pickle_dump(spending_origin, datafile_path + "spending_origin.p")
     print("Done")
 
 def main():

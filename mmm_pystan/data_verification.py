@@ -3,17 +3,8 @@ import numpy as np
 import pandas as pd 
 import pickle
 import matplotlib.pyplot as plt
+from global_variable import *
 
-datafile_path = "/Users/yanchunyang/Documents/datafiles/pystan/"
-datafile_origin_path = "/Users/yanchunyang/Documents/datafiles/"
-L = 14  #carryover period
-T = 7   #moving average period
-Kb = 7
-Km = 6
-Kl = 391
-media_list = ['AdWords', 'Apple Search Ads', 'Facebook','Snapchat', 'Tatari', 'bytedanceglobal_int']
-sample_size = 1000
-M = 330
 def read_dataset():
     with open(datafile_path + "spending.p", "rb") as f:
         df_spending = pickle.load(f)

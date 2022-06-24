@@ -3,6 +3,7 @@ This file is to provide functions of graphs.
 It is to support result_analysis.py
 """
 
+from platform import platform
 import numpy as np 
 import pandas as pd 
 import matplotlib.pyplot as plt 
@@ -30,6 +31,29 @@ def draw_graph_name(a, b, a_name, b_name):
     plt.close()
 
 """
+The below function is to draw the decay effect: alpha value
+"""
+def draw_decay_effect(df_parameter):
+    '''
+    Get the df_parameter and extract the alpha mean value to draw the bar chart for decay effect
+    '''
+    alpha_set = []
+    alpha_columns = ['alpha.' + str(i) for i in range(1, Km + 1)]
+    for item in alpha_columns:
+        alpha_value = df_parameter[item].values[:]
+        alpha_set.append(np.median(alpha_value))
+    title = "Decay Ratio: Advance user" if flag == 1 else "Decay Ratio: Revenue"
+    plt.figure(figsize=(11, 11))
+    plt.subplot(1,1,1)
+    plt.bar(media_list, alpha_set, width = 0.2)
+    plt.xticks(rotation=-75)
+    plt.xlabel("channel")
+    plt.ylabel("decay ratio")
+    plt.title(title)
+    plt.savefig(datafile_path + "decay_effect.png")
+
+
+"""
 The below two functions are to plot parameters distribution
 """
 def plot_distribution(df_parameter):
@@ -44,10 +68,10 @@ def plot_distribution(df_parameter):
     beta_b_columns = ['beta_b.' + str(i) for i in range(1, Kb + 1)]
     beta_m_columns = ['beta_m.' + str(i) for i in range(1, Km + 1)]
     alpha_columns = ['alpha.' + str(i) for i in range(1, Km + 1)]
-    theta_columns = ['theta.' + str(i) for i in range(1, Km + 1)]
+    #theta_columns = ['theta.' + str(i) for i in range(1, Km + 1)]
     sigma_columns = ['sigma']
     ru_columns = ['ru']
-    columns_set = [beta_b_columns, beta_m_columns, alpha_columns, theta_columns, sigma_columns, ru_columns]
+    columns_set = [beta_b_columns, beta_m_columns, alpha_columns,  sigma_columns, ru_columns]
     for col in columns_set:
         for item in col:
             plot_trace(df_parameter[item].values[:], item)
@@ -144,13 +168,14 @@ def draw_roas(roas_result):
             Return:
                     No. Draw the roas graphs for each channel and save to folder.
     '''
-
+    y_label = "new user acquired per dollar" if flag==1 else "revenue acquired per dollar spending"
     for i, item in enumerate(roas_result):
         plt.subplot(1, 1, 1)
         plt.title("Spending Return for " + media_list[i])
         plt.plot(item['datetime'], item['weekly_roas'])
+        plt.xticks(rotation=75)
         plt.xlabel("time")
-        plt.ylabel("new user acquired per dollor")
+        plt.ylabel(y_label)
         plt.savefig(datafile_path + "roas_" + media_list[i]+".png")
         plt.close()
 
@@ -163,13 +188,14 @@ def draw_roas_all(roas_result, media, name):
             Return:
                     No. Draw the roas graph for all channels and save to folder.
     '''
-
+    y_label = "new user acquired per dollar" if flag==1 else "revenue acquired per dollar spending"
     for i, item in enumerate(roas_result):
         plt.subplot(1,1,1)
         plt.plot(item['datetime'], item['weekly_roas'], label=media[i])
     plt.title("Spending Return" )
+    plt.xticks(rotation=75)
     plt.xlabel("time")
-    plt.ylabel("new user acquired per dollor")
+    plt.ylabel(y_label)
     plt.legend()
     plt.savefig(datafile_path + name + "_roas_all.png")
     plt.close()
@@ -190,18 +216,46 @@ def draw_origin_spending(spending_origin):
     shape = spending_origin.shape   
     day_index = np.arange(1, shape[0] + 1)
     datetimes = pd.to_datetime(day_index, unit='D', origin=pd.Timestamp(origin_date))
+    
+    for item in platform_list:
+        media_name = []
+        y_sub = []
+        for i in range(Km):
+            if item in media_list[i]:
+                y_sub.append(spending_origin[:,i])
+                media_name.append(media_list[i])
+        platform_length = len(media_name)
+        plt.subplot(1,1,1)
+        plt.title("Spending Distribution Among Networks " + item)
+        for i in range(0, platform_length):
+                plt.plot(datetimes, y_sub[i], label=media_name[i])
+        plt.legend()
+        plt.savefig(datafile_path + "spending_distribution_" + item +".png")
+        plt.close()
+    
+    media_name = []
+    y_sub = []
+    for i in range(Km):
+        sign = 0
+        for item in platform_list:
+            if item in media_list[i]:
+                sign = 1
+                break
+        if sign == 0:
+            media_name.append(media_list[i])
+            y_sub.append(spending_origin[:, i])    
     plt.subplot(1,1,1)
-    plt.title("Spending Distribution Among Networks")
-    for i in range(0, Km):
-        plt.plot(datetimes, spending_origin[:, i], label=media_list[i])
+    plt.title("Spending Distribution Among Networks " + item)
+    for i in range(0, len(media_name)):
+        plt.plot(datetimes, y_sub[i], label=media_name[i])
     plt.legend()
-    plt.savefig(datafile_path + "spending_distribution.png")
+    plt.savefig(datafile_path + "spending_distribution_others"  +".png")
     plt.close()
 
 
 """
+Draw all the saturation curves on the same graphs
 """
-
 def draw_all_data_saturation(results, spending_list, current_spending):
     '''
     Draw saturation curve for each channel. This one is with carryover effect.
@@ -224,6 +278,38 @@ def draw_all_data_saturation(results, spending_list, current_spending):
     plt.close()
 
 
+"""
+Draw Saturation Curves based on platforms
+"""
+def draw_platform_data_saturation(results, spending_list, current_spending):
+    '''
+    Draw saturation curve for each channel. This one is with carryover effect.
+            Parameters:
+                    results (list): adstock effect 
+                    spending_list: spending value for x axis.
+                    current_spending: the current spending with carryover effect
+            Return:
+                    saturation curves for all channels
+    '''
+    y_label = "log(newuser/1000)" if flag==1 else "log(revenue/100000"
+    for item in platform_list:
+        title_name = "saturation_" + item + "png"
+        for i in range(0, Km):
+                if item in media_list[i]:
+                        plt.plot(spending_list, results[i], label=media_list[i])
+                        plt.scatter(current_spending[i][0], current_spending[i][1], s=10)
+                
+        plt.title("Saturation Graph ")
+        plt.legend()
+        plt.xlabel("accumulative spending")
+        plt.ylabel(y_label)
+        plt.savefig(datafile_path + title_name)
+        plt.close()
+
+
+"""
+Draw Saturation Curve for each channel
+"""
 def draw_actual_saturation(results, spending_list, current_spending):
     '''
     Draw each channel's saturation curve
@@ -234,7 +320,7 @@ def draw_actual_saturation(results, spending_list, current_spending):
             Return:
                     Save each channel's saturation curve to folders.
     '''
-
+    y_label = "log(newuser/1000)" if flag==1 else "log(revenue/100000"
     for i in range(0, Km):
         plt.plot(spending_list[i], results[i], label=media_list[i])
         plt.axvline(current_spending[i][0], 0, 0.8, color = 'r', lw = 1, linestyle='--', label='mean')
@@ -245,7 +331,7 @@ def draw_actual_saturation(results, spending_list, current_spending):
         plt.text(current_spending[i][2], 0, "P 97.5")
         plt.title("Saturation Curve and Daily Spending for " + media_list[i])
         plt.xlabel("Spending")
-        plt.ylabel("log(newuser acquired/1000)")
+        plt.ylabel(y_label)
         plt.savefig(datafile_path + "Saturation Curve for " + media_list[i])
         plt.close()
 
@@ -267,7 +353,7 @@ def draw_seaonality(df_parameter, df_basic):
     season_values = df_parameter.loc[:, season_cols].values
     season_coes = np.mean(season_values, axis=0)
     df_update = df_basic[5:-1, 4:6]
-    day_index = np.arange(1, 393)
+    day_index = np.arange(1, M+2)
     datetimes = pd.to_datetime(day_index, unit='D', origin=pd.Timestamp(origin_date))
     results = np.dot(season_coes, df_update.T)
     newuser = np.exp(results) * 1000
@@ -283,7 +369,7 @@ def draw_seaonality(df_parameter, df_basic):
     Graph combination function for roas
 """
 
-def draw_channel_information(df_parameter, spending_origin, flag=1):
+def draw_channel_information(df_parameter, spending_origin):
     '''
     This function 
             1. prepares the data for calcuating the two roas (weekly and accumulative)
@@ -313,9 +399,7 @@ def draw_channel_information(df_parameter, spending_origin, flag=1):
    
     draw_roas(roas_result)
 
-    group_name = ['iOS', 'Android']
-    #group_name = ['Adwords', 'Apple', 'Facebook', 'Snapchat', 'bytedanceglobal', 'unknown', 'TV']
-    for item in group_name:
+    for item in platform_list:
         media_name = []
         roas_sub = []
         for i in range(Km):
@@ -328,7 +412,7 @@ def draw_channel_information(df_parameter, spending_origin, flag=1):
     roas_sub = []
     for i in range(Km):
         sign = 0
-        for item in group_name:
+        for item in platform_list:
             if item in media_list[i]:
                 sign = 1
                 break
@@ -336,3 +420,20 @@ def draw_channel_information(df_parameter, spending_origin, flag=1):
             media_name.append(media_list[i])
             roas_sub.append(roas_result[i])
     draw_roas_all(roas_sub, media_name, "others")
+
+"""
+draw contribution
+"""
+def draw_contribution(total, contribution):
+    total_sum = np.sum(total)
+    channel_sum = np.sum(contribution, axis=0)
+    ratio = channel_sum  * 1.0/ total_sum
+    title = "Channel Contribution: Advance Userr" if flag== 1 else "Channel Contribution: Revenue"
+    plt.figure(figsize=(11, 11))
+    plt.subplot(1,1,1)
+    plt.bar(media_list, ratio, width = 0.2)
+    plt.xticks(rotation=-75)
+    plt.xlabel("channel")
+    plt.ylabel("contribution")
+    plt.title(title)
+    plt.savefig(datafile_path + "channel_contribution.png")

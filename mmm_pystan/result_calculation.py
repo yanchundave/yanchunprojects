@@ -79,7 +79,8 @@ def get_roas(y_origin, remove_list, spending_list):
     df['spending'] = spending_update 
     df['weekly'] = df['datetime'].dt.strftime('%Y-%U')
     df_weekly_roas = df.groupby(['weekly']).agg({'spending':'sum', 'newuser':'sum', 'datetime':'min'}).reset_index()
-    df_weekly_roas['weekly_roas'] = df_weekly_roas['newuser'] / df_weekly_roas['spending']   
+    y_value = np.array([max(x, 0) for x in df_weekly_roas['newuser']])
+    df_weekly_roas['weekly_roas'] = y_value/ df_weekly_roas['spending']   
     return df_weekly_roas
 
 
@@ -262,5 +263,11 @@ def calculate_prediction_and_prediction_removed(df_parameter, label="onedave"):
     newuser_remove = np.exp(y_remove) * y_constant
     y_diff = newuser_origin - newuser_remove
    
+    """
     result_df = pd.DataFrame(y_diff, columns = media_list)
     result_df.to_csv(datafile_path + label + ".csv")
+
+    newuser_origin_df = pd.DataFrame(newuser_origin)
+    newuser_origin_df.to_csv(datafile_path + "newuser_origin.csv")
+    """
+    return newuser_origin, y_diff
