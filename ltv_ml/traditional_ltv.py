@@ -6,8 +6,9 @@ from sklearn.preprocessing import LabelEncoder
 from udf import read_from_database
 from keras.utils import np_utils
 from keras.models import Sequential
+from global_variable import *
 
-values_bucket = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 220, 250, 300]
+
 def assign_bucket(x):
     for i in range(0, len(values_bucket)):
         if values_bucket[i] >= x:
@@ -113,6 +114,7 @@ def get_data_from_database():
     df_x_y = pd.merge(advance_feature_6, revenue_user, on=['userid'], how='left')
     df_x_y = df_x_y.fillna(0)
     df_x_y['revenue_bucket'] = df_x_y['revenue'].apply(lambda x: assign_bucket(x))
+    df_x_y.to_csv(datafile_path + "df_x_y.csv")
 
     return df_x_y
 
@@ -123,8 +125,10 @@ def model_training(df_x_y):
     df_x_scale = std_scaler.fit_transform(df_x_y.loc[:, x_cols].values)
     df_x_scale_y = np.concatenate((df_x_scale, df_x_y['revenue_bucket'].values.reshape(-1,1)), axis=1)
     df_origin = pd.DataFrame(df_x_scale_y, columns = x_cols + ['revenue_bucket'])
+    df_origin['userid'] = df_x_y['userid']
+    df_origin.to_csv(datafile_path + "df_origin.csv")
 
-    train_set, test_set = split_train_test(df_origin, 0.2)
+    train_set, test_set = split_train_test(df_origin, 0.3)
     train_x, train_y = clean_dataset(train_set, x_cols)
     model = nn_model()
     model.fit(train_x, train_y, epochs=100, batch_size=75)
@@ -138,9 +142,13 @@ def model_training(df_x_y):
     accuracy = 1.0 * len(diff_class[diff_class <= 1]) / len(predicted_class)
     print("The accuracy is " + str(accuracy))
 
+    test_set['predicted_class'] = predicted_class
+    test_set.to_csv(datafile_path + "test_set.csv")
+
 
 def main():
-    df_x_y = get_data_from_database()
+    #df_x_y = get_data_from_database()
+    df_x_y = pd.read_csv(datafile_path + "df_x_y.csv", header=0)
     model_training(df_x_y)
 
 if __name__ == '__main__':
