@@ -319,3 +319,51 @@ JOIN SESSIONARRAY B
 ON A.USER_ID = B.USER_ID
 JOIN SESSIONFEATURE C
 ON B.USER_ID = C.USER_ID;
+
+---USER CNN EVENT COUNT WITH 7 DAYS
+DROP table IF EXISTS DBT.DEV_YANCHUN_PUBLIC.CNN_EVENT;
+CREATE table DBT.DEV_YANCHUN_PUBLIC.CNN_EVENT AS 
+WITH userlist AS
+(
+select USER_ID, 
+  to_date(convert_timezone('UTC','America/Los_Angeles',PV_TS::timestamp_ntz)) as event_window_start,
+ DATEADD('DAY', 7, to_date(convert_timezone('UTC','America/Los_Angeles',PV_TS::timestamp_ntz))) as event_window_end  
+from ANALYTIC_DB.DBT_MARTS.NEW_USER_ATTRIBUTION 
+where to_date(convert_timezone('UTC','America/Los_Angeles',PV_TS::timestamp_ntz)) >='2021-12-01'
+AND to_date(convert_timezone('UTC','America/Los_Angeles',PV_TS::timestamp_ntz)) < '2021-12-04'
+AND DELETED_STATUS = 'NOT DELETED' 
+AND FIRST_ADVANCE_TIMESTAMP IS NOT NULL
+),
+events as (
+SELECT A.USER_ID AS USER_ID, A.event_window_start AS start_date, B.EVENT_TYPE as event_type,
+  to_date(convert_timezone('UTC','America/Los_Angeles',B.CLIENT_EVENT_TIME::timestamp_ntz)) AS event_date
+FROM userlist as A 
+JOIN
+ANALYTIC_DB.DBT_MARTS.AMPLITUDE_DAO B
+ON to_varchar(A.USER_ID) = to_varchar(B.USER_ID)
+AND to_date(convert_timezone('UTC','America/Los_Angeles',B.CLIENT_EVENT_TIME::timestamp_ntz)) <= A.event_window_end
+AND to_date(convert_timezone('UTC','America/Los_Angeles',B.CLIENT_EVENT_TIME::timestamp_ntz)) >= A.event_window_start
+)
+select USER_ID, start_date, event_date, event_type, count(event_type) as event_volume
+FROM events
+GROUP BY USER_ID, start_date, event_date, event_type
+order by USER_ID, start_date, event_type, event_date;
+
+---USER SELECT REVENUE CNN
+with user_revenue as 
+(
+select USER_ID, SUM(REVENUE) as total_revenue
+  from DBT.DEV_YANCHUN_PUBLIC.USER_TRANSACTION_2022
+  WHERE date(TRANS_TIME) >= date('2022-01-01') and date(TRANS_TIME) < DATE('2022-07-01')
+  group by USER_ID
+),
+selected_user AS 
+(
+SELECT USER_ID, COUNT(*) AS total
+  from DBT.DEV_YANCHUN_PUBLIC.CNN_EVENT
+  group by USER_ID
+)
+SELECT a.USER_ID, b.total_revenue
+FROM selected_user a 
+join user_revenue b
+on a.USER_ID = b.USER_ID

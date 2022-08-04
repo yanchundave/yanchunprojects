@@ -1,5 +1,8 @@
 import numpy as np
 import jaydebeapi as jay
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
 
 def get_token(eventstr, vocab):
     splits = eventstr.strip().split(",")
@@ -31,3 +34,37 @@ def read_from_database(sql_str):
     curs.execute(sql_str)
     result = curs.fetchall()
     return result
+
+def feature_clean(df, numerical_columns, categorical_columns=None):
+    # obtain categorical_columns
+    columns_name = []
+    df_cat = df.loc[:, categorical_columns]
+    if categorical_columns:
+        cat_encoder = OneHotEncoder(sparse=False, categories='auto')
+        array_category = cat_encoder.fit_transform(df_cat)
+        category_name = cat_encoder.categories_
+        columns_name += [x for item in category_name for x in item]
+
+    # obtain numerica_columns
+    df_num = df.loc[:, numerical_columns]
+    df_num = df_num.fillna(0)
+    imputer = SimpleImputer(strategy='median')
+    scaler = StandardScaler()
+
+    x = imputer.fit_transform(df_num)
+    x = scaler.fit_transform(x)
+    x_combine = np.concatenate([array_category, x], axis=1)
+    columns_name += numerical_columns
+
+    return x_combine, columns_name
+
+def split_train_test(x, y, test_ratio, xx=None):
+    shuffled_indices = np.random.permutation(len(x))
+    test_set_size = int(len(x) * test_ratio)
+    test_indices = shuffled_indices[:test_set_size]
+    train_indices = shuffled_indices[test_set_size:]
+    if xx is not None:
+        return x[train_indices,:,:,:], x[test_indices,:,:,:], xx[train_indices,:], xx[test_indices,:], y[train_indices,:], y[test_indices,:]
+    else:
+        return x[train_indices,:,:,:], x[test_indices,:,:,:], y[train_indices,:], y[test_indices,:]
+
