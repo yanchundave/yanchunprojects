@@ -97,8 +97,20 @@ def get_data_from_database():
     advance_feature_2 = advance_feature_2.drop(['timediff'], axis=1)
     advance_feature_3 = advance_feature_3.drop(['revenue'], axis=1)
 
+    print("advance_feature_2 shape is ")
+    print(advance_feature_2.shape)
+
+    print("advance_feature_3 shape is ")
+    print(advance_feature_3.shape)
+
     advance_feature_4 = pd.merge(advance_feature_2, advance_feature_3, on=['userid'])
     advance_feature_5 = pd.merge(advance_feature_1, advance_feature_4, on=['userid'])
+
+    print("advance_feature_4 shape is ")
+    print(advance_feature_4.shape)
+
+    print("advance_feature_5 shape is ")
+    print(advance_feature_5.shape)
 
     df_session_raw = read_from_database(session_sql)
     session_feature = pd.DataFrame(df_session_raw, columns=['userid', 'lastquarter_session', 
@@ -106,7 +118,10 @@ def get_data_from_database():
     session_feature['session_std'] = session_feature['session_str'].apply(lambda x: get_std_str(x))
     session_feature = session_feature.drop(['session_str'], axis=1)
 
-    advance_feature_6 = pd.merge(advance_feature_5, session_feature, on=['userid'])
+    advance_feature_6 = pd.merge(advance_feature_5, session_feature, on=['userid'], how='left')
+
+    print("advance_feature_6 shape is ")
+    print(advance_feature_6.shape)
 
     df_revenue = read_from_database(revenue_sql)
     revenue_user = pd.DataFrame(df_revenue, columns=['userid', 'revenue'])
@@ -130,10 +145,10 @@ def model_training(df_x_y):
 
     train_set, test_set = split_train_test(df_origin, 0.3)
     train_x, train_y = clean_dataset(train_set, x_cols)
-    model = nn_model()
-    model.fit(train_x, train_y, epochs=100, batch_size=75)
-
     test_x, test_y = clean_dataset(test_set, x_cols)
+    model = nn_model()
+    model.fit(train_x, train_y, epochs=10, batch_size=75, validation_data=(test_x, test_y))
+
     predicted_y = model.predict(test_x)
     predicted_class = np.argmax(predicted_y, axis=1)
     acutal_class = test_set['revenue_bucket']

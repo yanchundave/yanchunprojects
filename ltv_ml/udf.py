@@ -38,7 +38,9 @@ def read_from_database(sql_str):
 def feature_clean(df, numerical_columns, categorical_columns=None):
     # obtain categorical_columns
     columns_name = []
-    df_cat = df.loc[:, categorical_columns]
+    array_category = None
+    if categorical_columns:
+        df_cat = df.loc[:, categorical_columns]
     if categorical_columns:
         cat_encoder = OneHotEncoder(sparse=False, categories='auto')
         array_category = cat_encoder.fit_transform(df_cat)
@@ -53,7 +55,10 @@ def feature_clean(df, numerical_columns, categorical_columns=None):
 
     x = imputer.fit_transform(df_num)
     x = scaler.fit_transform(x)
-    x_combine = np.concatenate([array_category, x], axis=1)
+    if array_category:
+        x_combine = np.concatenate([array_category, x], axis=1)
+    else:
+        x_combine = x
     columns_name += numerical_columns
 
     return x_combine, columns_name
@@ -68,3 +73,12 @@ def split_train_test(x, y, test_ratio, xx=None):
     else:
         return x[train_indices,:,:,:], x[test_indices,:,:,:], y[train_indices,:], y[test_indices,:]
 
+def split_train_test_two(x, y, test_ratio, xx=None):
+    shuffled_indices = np.random.permutation(len(x))
+    test_set_size = int(len(x) * test_ratio)
+    test_indices = shuffled_indices[:test_set_size]
+    train_indices = shuffled_indices[test_set_size:]
+    if xx is not None:
+        return x[train_indices,:], x[test_indices,:], xx[train_indices,:], xx[test_indices,:], y[train_indices], y[test_indices]
+    else:
+        return x[train_indices,:], x[test_indices,:], y[train_indices], y[test_indices]
