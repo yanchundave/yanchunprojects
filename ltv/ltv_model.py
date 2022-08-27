@@ -1,6 +1,6 @@
-import numpy as np 
-import pandas as pd 
-import lifetimes 
+import numpy as np
+import pandas as pd
+import lifetimes
 import missingno as msno
 import random
 from global_variable import *
@@ -8,7 +8,7 @@ from global_variable import *
 # Feature engineering to obtain the needed RFM features
 def data_clean():
     df = pd.read_csv(datafile + "advance_user.csv", header=0)
-    return df 
+    return df
 
 
 def ltv_statistical_model(df):
@@ -36,9 +36,9 @@ def ltv_statistical_model(df):
         bgf,
         dfupdate['frequency'],
         dfupdate['recency'],
-        dfupdate['T'], 
+        dfupdate['T'],
         dfupdate['monetary_update'],
-        time= 3, # month
+        time= 6, # month
         freq = 'D',
         discount_rate=0.01
     )
@@ -51,14 +51,14 @@ def ltv_statistical_model(df):
     dfone['expected_monetary'] = dfone['monetary_update']
     dfone['t_value'] = dfone['pred_num'] * dfone['monetary']
     print(sum(dfone['t_value']))
-    
+
     dftotal = pd.concat([dfupdate, dfone], axis=0)
     print(dftotal.shape)
     dftotal.to_csv(datafile + "dftotal.csv")
- 
+
 def main():
     df = pd.read_csv(datafile + "advance_user.csv", header=0)
     ltv_statistical_model(df)
-    
+
 if __name__ == '__main__':
     main()
