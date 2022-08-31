@@ -1,16 +1,19 @@
-import numpy as np 
-import pandas as pd 
-import lifetimes 
+import numpy as np
+import pandas as pd
+import lifetimes
 import missingno as msno
 import random
 from global_variable import *
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
+import davesci as ds
 
+con_write = ds.snowflake_connect(warehouse='DAVE_WH', role='DAVE_DATA_DEV')
 
 def read_data():
     predict_df = pd.read_csv(datafile + predict_file, header=0)
     actual_df = pd.read_csv(datafile + actual_file)
-    return predict_df, actual_df
+    all_user = pd.read_csv(datafile + "users_property.csv")
+    return predict_df, actual_df, all_user
 
 def analyze_data(predict_df, actual_df):
     predict_update = predict_df.loc[:, ['userid', 'pred_num', 't_value', 'frequency', 'prob_alive']]
@@ -37,10 +40,34 @@ def analyze_data(predict_df, actual_df):
     print("The actual revenue of these users is " + str(actual_six_month))
     print("The predict churn rate of these users is " + str(predict_churn_rate))
     print("The actual churn rate is " + str(actual_churn_rate))
-    
+
+def generate_predict_result(predict_df, actual_df, all_user):
+    df_user = all_user.loc[:, ['userid', 'startdate', 'platform', 'attribution', 'network']]
+    predict_update = predict_df.loc[:, ['userid', 'first_trans','pred_num', 't_value', 'frequency', 'prob_alive', 'predict_clv']]
+    actual_update = actual_df.loc[:, ['userid', 'trans_num', 'real_revenue']]
+
+    combine_1 = pd.merge(df_user, predict_update, on=['userid'], how='left')
+    combine_2 = pd.merge(combine_1, actual_update, on=['userid'], how='left')
+    combine_2 = combine_2.fillna(0)
+    combine_2['start_date'] = pd.to_datetime(combine_2['startdate'])
+    combine_2['start_month'] = combine_2['start_date'].apply(lambda x: x.strftime('%Y-%m-01'))
+    combine_2['predict_label'] = combine_2['first_trans'].apply(lambda x: 1 if x !=0 else 0)
+    combine_2['actual_label'] = combine_2['trans_num'].apply(lambda x: 1 if x != 0 else 0)
+    combine_2['tmp_label'] = combine_2['predict_label'] + combine_2['actual_label']
+    combine_2['active_label'] = combine_2['tmp_label'].apply(lambda x: 1 if x !=0 else 0)
+    combine_2 = combine_2.drop(['tmp_label', 'startdate'], axis=1)
+
+    ds.write_snowflake_table(
+        combine_2,
+        "ANALYTIC_DB.MODEL_OUTPUT.statistical_training_result",
+        con_write,
+        mode="create",
+        )
+
 def main():
-    predict_df, actual_df = read_data()
-    analyze_data(predict_df, actual_df)
+    predict_df, actual_df, all_user = read_data()
+    #analyze_data(predict_df, actual_df)
+    generate_predict_result(predict_df, actual_df, all_user)
 
 if __name__ == '__main__':
     main()
