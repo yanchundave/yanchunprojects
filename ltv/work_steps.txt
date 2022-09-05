@@ -1,0 +1,24 @@
+Step 1:
+    create a temp table to save all the users after PV from 2021-01-01 to 2021-12-31 --Done  2770587
+
+Step 2:
+    extract all the transactions of users from 2021-01-01 to 2021-06-29  -- Done  778260
+
+Step 3:
+    Calculate the rate of users without transaction  0.2809
+
+Step 4:
+    Use all the transactions of 2021-01-01 to 2022-03-31 as the training set to get result (Done)
+
+Step 5:
+    Adjust all the T is over 90 to 0
+
+Step 6:
+    Calculate Arpu -Arpu 127, comparing 134 from structural model. The result looks not bad
+
+Step 7:
+    Compare the predict revenue with the true revenue and get the percentage  - working on it
+    some users have only one frequency, some have multiple trans, some have one trans in test period
+
+Step 8:
+    Apple the formula LTV = ARPU / Churn Rate to get the LTV

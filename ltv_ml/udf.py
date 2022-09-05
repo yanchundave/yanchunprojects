@@ -9,7 +9,7 @@ def get_token(eventstr, vocab):
     return [vocab[x] for x in splits]
 
 
-def read_from_database(sql_str):
+def read_from_database(sql_str, role="DAVE_DATA_DEV"):
     with open('/Users/yanchunyang/pwd/snowflake.passphrase', 'r') as f:
         passphrase = f.read().strip()
     username = "yanchun.yang@dave.com"
@@ -17,7 +17,7 @@ def read_from_database(sql_str):
     jdbcpath = "/Users/yanchunyang/lib/jdbc/snowflake-jdbc-3.13.8.jar"
     jdbc_driver_name = "net.snowflake.client.jdbc.SnowflakeDriver"
     hostname= "qc63563.snowflakecomputing.com"
-    role = "DAVE_DATA_DEV"
+    role = role
     warehouse = "DAVE_USER_WH"
     keyfile = "/Users/yanchunyang/.ssh/snowflake.p8"
 

@@ -1,15 +1,15 @@
------User Last Event before 2022            
+-----User Last Event before 2022
 DROP table IF EXISTS DBT.DEV_YANCHUN_PUBLIC.USER_START_RECENT;
-CREATE table DBT.DEV_YANCHUN_PUBLIC.USER_START_RECENT AS          
-with user_pv as 
+CREATE table DBT.DEV_YANCHUN_PUBLIC.USER_START_RECENT AS
+with user_pv as
 (
    SELECT USER_ID, to_date(PV_TS) as starttime
-    FROM ANALYTIC_DB.DBT_marts.new_user_reattribution 
-    WHERE to_date(PV_TS) >= '2021-01-01' 
+    FROM ANALYTIC_DB.DBT_marts.new_user_reattribution
+    WHERE to_date(PV_TS) >= '2021-01-01'
     AND to_date(PV_TS) < '2022-01-01'
 
 ),
-user_event as 
+user_event as
 (
     SELECT USER_ID, MAX(EVENT_DS_PST) AS last_date
     FROM ANALYTIC_DB.DBT_METRICS.ONE_DAVE_ACTIVE_USERS
@@ -40,7 +40,7 @@ where LATETIME IS NOT NULL
   AND LATETIME < '2021-07-01'
 )
 SELECT A.USER_ID, A.STARTTIME AS STARTTIME, A.LATETIME AS LATETIME, B.EVENT_TYPE, B.CLIENT_EVENT_TIME
-FROM users as A 
+FROM users as A
 JOIN
 ANALYTIC_DB.DBT_MARTS.AMPLITUDE_DAO B
 ON to_varchar(A.USER_ID) = to_varchar(B.USER_ID)
@@ -48,7 +48,7 @@ AND to_date(A.LATETIME) = to_date(convert_timezone('UTC','America/Los_Angeles',B
 WHERE to_date(convert_timezone('UTC','America/Los_Angeles',B.CLIENT_EVENT_TIME::timestamp_ntz)) >='2021-01-01'
 AND to_date(convert_timezone('UTC','America/Los_Angeles',B.CLIENT_EVENT_TIME::timestamp_ntz)) < '2021-07-01'
 AND B.SESSION_ID > 0
-AND B.EVENT_TYPE NOT LIKE '[%' 
+AND B.EVENT_TYPE NOT LIKE '[%'
 ORDER BY B.CLIENT_EVENT_TIME;
 
 DROP table IF EXISTS DBT.DEV_YANCHUN_PUBLIC.USER_EVENT_B;
@@ -61,10 +61,10 @@ where LATETIME IS NOT NULL
   AND LATETIME >= '2021-07-01'
   AND LATETIME < '2022-01-01'
 )
-SELECT A.USER_ID, A.STARTTIME AS STARTTIME, A.LATETIME AS LATETIME, 
+SELECT A.USER_ID, A.STARTTIME AS STARTTIME, A.LATETIME AS LATETIME,
 B.EVENT_TYPE, B.CLIENT_EVENT_TIME,
 ROW_NUMBER() OVER (PARTITION BY A.USER_ID ORDER BY B.CLIENT_EVENT_TIME) AS ROW_NUMBER
-FROM users as A 
+FROM users as A
 JOIN
 ANALYTIC_DB.DBT_MARTS.AMPLITUDE_DAO B
 ON to_varchar(A.USER_ID) = to_varchar(B.USER_ID)
@@ -72,13 +72,13 @@ AND to_date(A.LATETIME) = to_date(convert_timezone('UTC','America/Los_Angeles',B
 WHERE to_date(convert_timezone('UTC','America/Los_Angeles',B.CLIENT_EVENT_TIME::timestamp_ntz)) >='2021-07-01'
 AND to_date(convert_timezone('UTC','America/Los_Angeles',B.CLIENT_EVENT_TIME::timestamp_ntz)) < '2022-01-01'
 AND B.SESSION_ID > 0
-AND B.EVENT_TYPE NOT LIKE '[%' 
+AND B.EVENT_TYPE NOT LIKE '[%'
 ORDER BY B.CLIENT_EVENT_TIME;
 
 ---USER LAST EVEN STRING
 DROP table IF EXISTS DBT.DEV_YANCHUN_PUBLIC.USER_EVENT_STR;
 CREATE table DBT.DEV_YANCHUN_PUBLIC.USER_EVENT_STR AS
-with event_a as 
+with event_a as
 (
 select USER_ID, STARTTIME, ARRAY_TO_STRING(ARRAY_AGG(EVENT_TYPE), ',') as eventstring
   FROM DBT.DEV_YANCHUN_PUBLIC.USER_EVENT_A
@@ -98,36 +98,36 @@ SELECT * FROM event_b;
 DROP TABLE IF EXISTS DBT.DEV_YANCHUN_PUBLIC.USER_TRANSACTION_2022;
 CREATE table DBT.DEV_YANCHUN_PUBLIC.USER_TRANSACTION_2022
 AS
-with user_pv AS 
+with user_pv AS
 (
-    SELECT 
-    USER_ID, 
+    SELECT
+    USER_ID,
     TO_DATE(PV_TS) AS startdate
     FROM ANALYTIC_DB.DBT_MARTS.NEW_USER_REATTRIBUTION
-    WHERE to_date(PV_TS) >= DATE('2021-01-01') 
+    WHERE to_date(PV_TS) >= DATE('2021-01-01')
     AND to_date(PV_TS) < DATE('2022-01-01')
 ),
-advance_records AS 
+advance_records AS
 (
-    SELECT 
-    TO_VARCHAR(advance_id) AS trans_id, 
-    user_pv.USER_ID AS user_id, 
+    SELECT
+    TO_VARCHAR(advance_id) AS trans_id,
+    user_pv.USER_ID AS user_id,
     user_pv.startdate AS startdate,
     TO_DATE(advance_disbursement_time_utc) AS trans_time,
     adv_fee_orig + adv_tip_orig AS revenue
     FROM DBT.DEV_SOLIN_FINANCE.dim_advance_flat advance
-    JOIN user_pv 
+    JOIN user_pv
     ON user_pv.USER_ID = advance.user_id
     WHERE TO_DATE(advance_disbursement_time_utc) < DATE('2022-07-01')
-), 
-overdraft_records AS 
+),
+overdraft_records AS
 (
-    SELECT 
-    overdraft_id AS trans_id, 
-    user_pv.USER_ID AS user_id, 
+    SELECT
+    overdraft_id AS trans_id,
+    user_pv.USER_ID AS user_id,
     user_pv.startdate AS startdate,
     TO_DATE(overdraft_disbursement_time_utc) AS trans_time,
-    overdraft_service_fee_orig + 
+    overdraft_service_fee_orig +
     overdraft_express_fee_orig +
     overdraft_user_tip_orig AS revenue
     FROM DBT.DEV_SOLIN_FINANCE.dim_overdraft_flat overdraft
@@ -141,12 +141,12 @@ SELECT * FROM overdraft_records;
 
 ----USER ACTIVITY
 DROP table IF EXISTS DBT.DEV_YANCHUN_PUBLIC.USER_MONTH_ACTIVE;
-CREATE table DBT.DEV_YANCHUN_PUBLIC.USER_MONTH_ACTIVE AS          
-with USER_PV as 
+CREATE table DBT.DEV_YANCHUN_PUBLIC.USER_MONTH_ACTIVE AS
+with USER_PV as
 (
    SELECT USER_ID, to_date(PV_TS) as STARTTIME
-    FROM ANALYTIC_DB.DBT_marts.new_user_reattribution 
-    WHERE to_date(PV_TS) >= '2021-01-01' 
+    FROM ANALYTIC_DB.DBT_marts.new_user_reattribution
+    WHERE to_date(PV_TS) >= '2021-01-01'
     AND to_date(PV_TS) < '2022-01-01'
 
 )
@@ -154,7 +154,7 @@ SELECT A.USER_ID, LEFT(A.STARTTIME, 7) AS STARTMONTH, LEFT(B.ONE_DAVE_ACTIVE_DS,
 FROM USER_PV A
 LEFT JOIN DBT.DBT_METRICS.ONE_DAVE_ACTIVE_USERS B
 ON A.USER_ID = B.USER_ID
-WHERE date(B.ONE_DAVE_ACTIVE_DS) >= date('2021-01-01') 
+WHERE date(B.ONE_DAVE_ACTIVE_DS) >= date('2021-01-01')
 AND date(B.ONE_DAVE_ACTIVE_DS) < date('2022-01-01')
 GROUP BY A.USER_ID, LEFT(A.STARTTIME, 7), LEFT(B.ONE_DAVE_ACTIVE_DS, 7);
 
@@ -169,43 +169,43 @@ GROUP BY USER_ID, LEFT(STARTDATE, 7), LEFT(TRANS_TIME, 7);
 --- User demographic property
 
 DROP table IF EXISTS DBT.DEV_YANCHUN_PUBLIC.USER_DEMOGRAPHICS;
-CREATE table DBT.DEV_YANCHUN_PUBLIC.USER_DEMOGRAPHICS AS          
-SELECT USER_ID, BOD_ACCOUNT_OPEN_USER, BOD_ACCOUNT_FUNDED_USER, BOD_ACCOUNT_ACTIVATED_USER, 
+CREATE table DBT.DEV_YANCHUN_PUBLIC.USER_DEMOGRAPHICS AS
+SELECT USER_ID, BOD_ACCOUNT_OPEN_USER, BOD_ACCOUNT_FUNDED_USER, BOD_ACCOUNT_ACTIVATED_USER,
 CASE WHEN PLATFORM LIKE '%ios%' THEN 1 ELSE 0 END AS IOS,
 CASE WHEN PLATFORM LIKE '%android%' THEN 1 ELSE 0 END AS ANDROID
-FROM ANALYTIC_DB.DBT_marts.new_user_reattribution 
-WHERE to_date(PV_TS) >= '2021-01-01' 
+FROM ANALYTIC_DB.DBT_marts.new_user_reattribution
+WHERE to_date(PV_TS) >= '2021-01-01'
 AND to_date(PV_TS) < '2022-01-01'
 
 -----User avereage advance amount
 DROP table IF EXISTS DBT.DEV_YANCHUN_PUBLIC.USER_ADVANCE_2022;
 CREATE table DBT.DEV_YANCHUN_PUBLIC.USER_ADVANCE_2022
 AS
-with user_pv AS 
+with user_pv AS
 (
-    SELECT 
-    USER_ID, 
+    SELECT
+    USER_ID,
     TO_DATE(PV_TS) AS startdate
     FROM ANALYTIC_DB.DBT_MARTS.NEW_USER_REATTRIBUTION
-    WHERE to_date(PV_TS) >= DATE('2021-01-01') 
+    WHERE to_date(PV_TS) >= DATE('2021-01-01')
     AND to_date(PV_TS) < DATE('2022-01-01')
 ),
-advance_records AS 
+advance_records AS
 (
-    SELECT 
-    user_pv.USER_ID AS user_id, 
+    SELECT
+    user_pv.USER_ID AS user_id,
     user_pv.startdate AS startdate,
     LEFT(advance_disbursement_time_utc, 7) AS trans_time,
     AVG(ADV_AMOUNT) AS advance_amount
     FROM DBT.DEV_SOLIN_FINANCE.dim_advance_flat advance
-    JOIN user_pv 
+    JOIN user_pv
     ON user_pv.USER_ID = advance.user_id
     GROUP BY user_pv.USER_ID, LEFT(advance_disbursement_time_utc, 7), startdate
-), 
-overdraft_records AS 
+),
+overdraft_records AS
 (
-    SELECT 
-    user_pv.USER_ID AS user_id, 
+    SELECT
+    user_pv.USER_ID AS user_id,
     user_pv.startdate AS startdate,
     LEFT(overdraft_disbursement_time_utc, 7) AS trans_time,
     AVG(OVERDRAFT_DISBURSEMENT_AMT) AS advance_amount
@@ -243,7 +243,7 @@ DROP table IF EXISTS DBT.DEV_YANCHUN_PUBLIC.EVENT_SEQ;
 CREATE table DBT.DEV_YANCHUN_PUBLIC.EVENT_SEQ
 AS
 WITH TMP
-AS 
+AS
 (SELECT FRONT_EVENT, BACK_EVENT, USER_ID
 FROM DBT.DEV_YANCHUN_PUBLIC.USER_EVENT_SEQ
 ORDER BY FRONT_EVENT, BACK_EVENT, CLIENT_EVENT_TIME
@@ -257,7 +257,7 @@ HAVING COUNT(USER_ID) <= 1130000 AND COUNT(USER_ID) > 1
 ORDER BY COUNT(USER_ID) DESC
   )
   SELECT A.FRONT_EVENT, A.BACK_EVENT, ARRAY_TO_STRING(ARRAY_AGG(B.USER_ID), ',') AS USERSTR
-  FROM EVENTLIST A 
+  FROM EVENTLIST A
   JOIN DBT.DEV_YANCHUN_PUBLIC.USER_EVENT_SEQ B
   ON A.FRONT_EVENT = B.FRONT_EVENT AND A.BACK_EVENT = B.BACK_EVENT
   GROUP BY A.FRONT_EVENT, A.BACK_EVENT
@@ -272,7 +272,7 @@ WITH USERLIST AS
 USERSESSION AS
 (
     SELECT A.USER_ID, EVENT_DS_PST
-    FROM USERLIST A 
+    FROM USERLIST A
     JOIN ANALYTIC_DB.DBT_METRICS.ONE_DAVE_ACTIVE_USERS B
     ON A.USER_ID = B.USER_ID
 ),
@@ -288,7 +288,7 @@ MONTH_METRIC AS
     GROUP BY USER_ID, LEFT(EVENT_DS_PST,7)
 )
 SELECT A.USER_ID, A.SESSIONTOTAL, A.MAXDATE, B.MONTHNUMBER, B.MONTHSESSION, DATEDIFF('day', DATE(A.MAXDATE), DATE('2022-01-01')) AS LASTSESSION
-FROM GROUP_METRIC A 
+FROM GROUP_METRIC A
 JOIN MONTH_METRIC B
 ON A.USER_ID = B.USER_ID
 
@@ -301,43 +301,43 @@ SELECT USER_ID, SUM(MONTHSESSION) AS LASTQUARTER_SESSION
   WHERE MONTHNUMBER IN ('2021-10', '2021-11', '2021-12')
   GROUP BY USER_ID
 ),
-SESSIONARRAY AS 
+SESSIONARRAY AS
 (
  SELECT USER_ID, ARRAY_TO_STRING(ARRAY_AGG(MONTHSESSION), ',') AS SESSION_STR
   FROM DBT.DEV_YANCHUN_PUBLIC.USER_SESSION_FEATURE_1
   GROUP BY USER_ID
 ),
-SESSIONFEATURE AS 
+SESSIONFEATURE AS
 (
 SELECT USER_ID, SESSIONTOTAL, LASTSESSION, COUNT(MONTHNUMBER) AS ACTIVEMONTH
   FROM DBT.DEV_YANCHUN_PUBLIC.USER_SESSION_FEATURE_1
   GROUP BY USER_ID, SESSIONTOTAL, LASTSESSION
 )
-SELECT A.USER_ID, A.LASTQUARTER_SESSION, B.SESSION_STR, C.SESSIONTOTAL, C.LASTSESSION, C.ACTIVEMONTH
-FROM LASTQUARTER A 
-JOIN SESSIONARRAY B
+SELECT B.USER_ID, A.LASTQUARTER_SESSION, B.SESSION_STR, C.SESSIONTOTAL, C.LASTSESSION, C.ACTIVEMONTH
+FROM SESSIONARRAY B
+LEFT JOIN LASTQUARTER A
 ON A.USER_ID = B.USER_ID
-JOIN SESSIONFEATURE C
+LEFT JOIN SESSIONFEATURE C
 ON B.USER_ID = C.USER_ID;
 
 ---USER CNN EVENT COUNT WITH 7 DAYS
 DROP table IF EXISTS DBT.DEV_YANCHUN_PUBLIC.CNN_EVENT;
-CREATE table DBT.DEV_YANCHUN_PUBLIC.CNN_EVENT AS 
+CREATE table DBT.DEV_YANCHUN_PUBLIC.CNN_EVENT AS
 WITH userlist AS
 (
-select USER_ID, 
+select USER_ID,
   to_date(convert_timezone('UTC','America/Los_Angeles',PV_TS::timestamp_ntz)) as event_window_start,
- DATEADD('DAY', 7, to_date(convert_timezone('UTC','America/Los_Angeles',PV_TS::timestamp_ntz))) as event_window_end  
-from ANALYTIC_DB.DBT_MARTS.NEW_USER_ATTRIBUTION 
+ DATEADD('DAY', 7, to_date(convert_timezone('UTC','America/Los_Angeles',PV_TS::timestamp_ntz))) as event_window_end
+from ANALYTIC_DB.DBT_MARTS.NEW_USER_ATTRIBUTION
 where to_date(convert_timezone('UTC','America/Los_Angeles',PV_TS::timestamp_ntz)) >='2021-12-01'
 AND to_date(convert_timezone('UTC','America/Los_Angeles',PV_TS::timestamp_ntz)) < '2021-12-04'
-AND DELETED_STATUS = 'NOT DELETED' 
+AND DELETED_STATUS = 'NOT DELETED'
 AND FIRST_ADVANCE_TIMESTAMP IS NOT NULL
 ),
 events as (
 SELECT A.USER_ID AS USER_ID, A.event_window_start AS start_date, B.EVENT_TYPE as event_type,
   to_date(convert_timezone('UTC','America/Los_Angeles',B.CLIENT_EVENT_TIME::timestamp_ntz)) AS event_date
-FROM userlist as A 
+FROM userlist as A
 JOIN
 ANALYTIC_DB.DBT_MARTS.AMPLITUDE_DAO B
 ON to_varchar(A.USER_ID) = to_varchar(B.USER_ID)
@@ -350,20 +350,188 @@ GROUP BY USER_ID, start_date, event_date, event_type
 order by USER_ID, start_date, event_type, event_date;
 
 ---USER SELECT REVENUE CNN
-with user_revenue as 
+with user_revenue as
 (
 select USER_ID, SUM(REVENUE) as total_revenue
   from DBT.DEV_YANCHUN_PUBLIC.USER_TRANSACTION_2022
   WHERE date(TRANS_TIME) >= date('2022-01-01') and date(TRANS_TIME) < DATE('2022-07-01')
   group by USER_ID
 ),
-selected_user AS 
+selected_user AS
 (
 SELECT USER_ID, COUNT(*) AS total
   from DBT.DEV_YANCHUN_PUBLIC.CNN_EVENT
   group by USER_ID
 )
 SELECT a.USER_ID, b.total_revenue
-FROM selected_user a 
+FROM selected_user a
 join user_revenue b
 on a.USER_ID = b.USER_ID
+
+-----USER ADVANCE FEATURE
+-----ADVANCE FEATURES
+DROP TABLE IF EXISTS DBT.DEV_YANCHUN_PUBLIC.USER_ADVANCE_FEATURE_1;
+CREATE table DBT.DEV_YANCHUN_PUBLIC.USER_ADVANCE_FEATURE_1
+AS
+with USER_TRANS AS
+    (
+        SELECT
+        USER_ID,
+        STARTDATE,
+        TRANS_TIME,
+        TRANS_ID,
+        REVENUE
+        FROM DBT.DEV_YANCHUN_PUBLIC.USER_TRANSACTION_2022
+        WHERE to_date(TRANS_TIME) < '2022-01-01'
+    )
+    SELECT
+    USER_ID,
+    STARTDATE,
+    COUNT(TRANS_ID) AS frequency,
+    DATEDIFF('day', DATE(MIN(TRANS_TIME)), DATE('2022-01-01')) AS T,
+    DATEDIFF('day', DATE(MIN(TRANS_TIME)), date(MAX(TRANS_TIME))) AS recency,
+    DATEDIFF('day', DATE(MIN(STARTDATE)), date('2022-12-31')) AS AGE,
+    AVG(REVENUE) AS monetary
+    FROM USER_TRANS
+    GROUP BY USER_ID, STARTDATE;
+
+-----Account Database
+
+SELECT * FROM ACCOUNTING.DBT_LOCAL.USER_DATA_2022
+
+SELECT * FROM ACCOUNTING.DBT_LOCAL.USER_REV
+
+SELECT * FROM ACCOUNTING.DBT_PROD.DIM_OVERDRAFT_FLAT --REAPLACE SONG'S OVERDRAFT TABLE
+
+SELECT * FROM ACCOUNTING.DBT_PROD.DIM_ADVANCE_FLAT --REPLACE SONG'S ADVANCE TABLE
+
+
+-----BANK CONNECTION
+DROP table IF EXISTS DBT.DEV_YANCHUN_PUBLIC.USER_BANK_CONNECTION;
+CREATE TABLE DBT.DEV_YANCHUN_PUBLIC.USER_BANK_CONNECTION AS
+SELECT
+DISTINCT bc.user_id,
+CASE
+  WHEN DISPLAY_NAME is null THEN 'blank'
+  WHEN DISPLAY_NAME like 'Chime%' THEN 'CHIME'
+  WHEN DISPLAY_NAME like 'Varo%' or DISPLAY_NAME ='Albert' or DISPLAY_NAME ='Step'   or DISPLAY_NAME like 'Go%Bank%'
+  THEN 'other neo bank'
+  ELSE 'traiditonal'
+  END AS bank_category,
+bc.id  AS bank_account_id,
+RANK() OVER (PARTITION BY bc.USER_ID ORDER BY bc.UPDATED,bc.LAST_PULL, bc.INITIAL_PULL DESC) AS rank,
+bc.HAS_VALID_CREDENTIALS,
+HAS_TRANSACTIONS
+FROM APPLICATION_DB.GOOGLE_CLOUD_MYSQL_DAVE.BANK_ACCOUNT ba
+LEFT JOIN APPLICATION_DB.GOOGLE_CLOUD_MYSQL_DAVE."BANK_CONNECTION" AS  bc
+ON ba.user_id = bc.user_id AND ba.bank_connection_id = bc.id
+           --  left join APPLICATION_DB.GOOGLE_CLOUD_MYSQL_DAVE.INSTITUTION i on i.ID = ba.INSTITUTION_ID
+LEFT JOIN analytic_db.dbt_marts.fct_advance_approvals ap
+ON ap.user_id = bc.user_id AND ap.BANK_ACCOUNT_ID=bc.id
+WHERE 1=1
+AND bc.deleted IS NULL
+AND ba.deleted IS NULL
+AND ba._FIVETRAN_DELETED = 'false'
+AND bc._FIVETRAN_DELETED = 'false'
+AND bc.banking_data_source in ('PLAID', 'MX')
+--     and bc.User_ID in ('1806882','1393948','11609725')
+AND (ba.MICRO_DEPOSIT IN ('COMPLETED') or ba.MICRO_DEPOSIT is NULL)
+qualify Rank = 1
+
+-------
+FORECAST_DATE = '2021-04-01'
+
+DROP TABLE IF EXISTS DBT.DEV_YANCHUN_PUBLIC.LTV_USER_2022;
+CREATE table DBT.DEV_YANCHUN_PUBLIC.LTV_USER_2022
+AS
+SELECT
+USER_ID,
+TO_DATE(PV_TS) AS startdate,
+PLATFORM,
+ATTRIBUTION,
+NETWORK,
+BOD_ACCOUNT_OPEN_USER,
+BOD_DIRECT_DEPOSIT_USER,
+IS_NEW_USER
+FROM ANALYTIC_DB.DBT_MARTS.NEW_USER_REATTRIBUTION
+WHERE to_date(PV_TS) >= DATE('2021-01-01')
+AND to_date(PV_TS) < DATE('2022-08-01');
+------- NEW USER YELLOW FEATURE
+
+DROP TABLE IF EXISTS DBT.DEV_YANCHUN_PUBLIC.LTV_USER_2022;
+CREATE table DBT.DEV_YANCHUN_PUBLIC.LTV_USER_2022
+AS
+WITH USER_SUBSET AS
+(
+  SELECT
+  USER_ID,
+  STARTDATE,
+  PLATFORM,
+  ATTRIBUTION,
+  NETWORK,
+  BOD_ACCOUNT_OPEN_USER,
+  BOD_DIRECT_DEPOSIT_USER,
+  DATE({FORECAST_DATE}) AS FORECASTDATE,
+  DATEADD('month', -3, {FORECAST_DATE}) AS STARTDATE,
+  DATEADD('month', 6, {FORECAST_DATE}) AS ENDDATE
+  FROM DBT.DEV_YANCHUN_PUBLIC.LTV_USER_2022 USER
+  WHERE STARTDATE < {FORECAST_DATE}
+),
+UW AS (
+  SELECT
+  dau.user_id,
+  row_number() over (partition by dau.USER_ID order by dau.requested_ds_pst DESC ) rank,
+  dau.requested_ds_pst closest_request,
+  dau.disbursement_ds_pst  closest_dis,
+  case when closest_dis is null then 1 else 0 end as MOST_RECENT_REQUEST_DECLINE,
+  dau.payback_ds_pst closest_expect_payback,
+  dau.prev_advance_bucket closest_prev_advance_bucket,
+  dau.max_approved_amount,
+  lag(max_approved_amount)over (partition by dau.user_id order by dau.requested_ds_pst DESC  ) AS LAST_MAX_APPROVED_AMOUNT,
+  COALESCE(dau.advance_taken_amount, dau.overdraft_amount) AS ADVANCE_TAKEN_AMOUNT,
+  FROM ANALYTIC_DB.DBT_marts.dim_advance_users as dau
+  JOIN USER_SUBSET USERS
+  ON dau.user_id=USERS.USER_ID
+  where REQUESTED_DS_PST <USERS.FORECASTDATE
+  qualify rank = 1
+),
+APPROVED_BANK AS (
+  SELECT advance_requests.user_id,
+  COUNT(DISTINCT
+    IFF(TO_NUMERIC(advance_requests.max_approved_amount) IS NOT NULL,
+    advance_requests.bank_account_id, NULL)) AS approved_bank_count,
+  FROM analytic_db.dbt_marts.fct_advance_approvals AS advance_requests -- included EC
+  LEFT JOIN analytic_db.dbt_marts.fct_advances AS advance_takeout -- legacy advance only
+  ON advance_requests.advance_approval_id = advance_takeout.chosen_advance_approval_id
+  LEFT JOIN analytic_db.dbt_marts.fct_overdraft_disbursement AS o2_takeout -- EC overdraft only
+  ON advance_requests.advance_approval_id = o2_takeout.approval_id
+  LEFT JOIN USER_SUBSET USERS
+  ON ADVANCE_REQUESTS.USER_ID = USERS.USER_ID
+  where ADVANCE_REQUESTS.REQUESTED_DS<USERS.FORECASTDATE
+  group by 1
+  )
+SELECT
+USERS.USER_ID,
+USERS.STARTDATE,
+USERS.PLATFORM,
+USERS.ATTRIBUTION,
+USERS.NETWORK,
+USERS.BOD_ACCOUNT_OPEN_USER,
+USERS.BOD_DIRECT_DEPOSIT_USER,
+USERS.FORECASTDATE,
+USERS.STARTDATE,
+USERS.ENDDATE,
+BANKING.BANK_CATEGORY,
+BANKING.HAS_VALID_CREDENTIALS,
+UW.MOST_RECENT_REQUEST_DECLINE,
+UW.LAST_MAX_APPROVED_AMOUNT,
+UW.ADVANCE_TAKEN_AMOUNT,
+FROM USER_SUBSET USERS
+LEFT JOIN DBT.DEV_YANCHUN_PUBLIC.USER_BANK_CONNECTION BANKING
+ON USERS.USER_ID
+LEFT JOIN UW
+ON USERS.USER_ID = UW.USER_ID
+LEFT JOIN APPROVED_BANK
+ON USERS.USER_ID = APPROVED_BANK.USER_ID;
+
+

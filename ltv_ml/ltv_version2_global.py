@@ -36,7 +36,7 @@ numeric_columns = [
     'sessiontotal'	,
     'lastsession'	,
     'activemonth'	,
-    'session_std'	
+    'session_std'
 ]
 """
 """
@@ -45,19 +45,19 @@ frequency and TAKEOUT_COUNT has strong correlation so remove TAKEOUT_COUNT
 AFTER REMOVING THESE FEATURES, R-SQUARE DROP FROM 0.374 TO 0.371
 """
 numeric_columns = [
- 
+
     'BOD_ACCOUNT_OPEN_USER',
-    
+
     'BOD_DIRECT_DEPOSIT_USER',
-    
+
     'IS_NEW_USER',
     'MOST_RECENT_REQUEST_DECLINE',
     'MAX_APPROVED_AMOUNT',
-   
+
     'HAS_VALID_CREDENTIALS',
-   
+
     'APPROVED_BANK_COUNT',
-   
+
     'ADVANCE_TAKEN_AMOUNT',
     'sine_month',
     'cosine_month',
@@ -72,13 +72,14 @@ numeric_columns = [
     'sessiontotal'	,
     'lastsession'	,
     'activemonth'	,
-    'session_std'	
+    'session_std'
 ]
 """
 categorical_columns = [
   'PLATFORM',
     'ATTRIBUTION',
-    'BANK_CATEGORY' 
+    'BANK_CATEGORY',
+    'CHANNEL'
 ]
 """
 categorical_columns = None
