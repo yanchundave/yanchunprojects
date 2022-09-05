@@ -54,22 +54,36 @@ def feature_clean(df, numerical_columns, categorical_columns=None):
 
     return x_combine, columns_name
 
-def linear_regression(df_train, df_test):
-    columns = df_train.columns
-    x_columns = columns[0: -4]
+def nn_model():
+    model = Sequential()
+    model.add(Dense(32, input_dim=27, activation='relu'))
+    model.add(Dense(16, activation='linear'))
+    model.add(Dense(1, activation='linear'))
+    model.compile(loss='mse', optimizer='adam', metrics=['mse', 'mae'])
+    return model
 
-    x_train = df_train.loc[:, x_columns].values
-    y_train = df_train['REVENUE']
-    x_test = df_test.loc[:, x_columns].values
-    y_test = df_test['REVENUE']
+def ann_model( x_train, x_test,  y_train, y_test, df_test):
+    model = nn_model()
+    model.fit(x_train, y_train, epochs=30, batch_size=75, validation_data=(x_test, y_test))
+    y_predict = model.predict(x_test)
+    df_test['PREDICT'] = y_predict
+    print("nn model result is ")
+    print(np.mean(y_test))
+    print(np.mean(df_test['PREDICT']))
+
+
+def linear_regression(x_train, x_test, y_train, y_test, df_test):
 
     reg = LinearRegression()
     reg.fit(x_train, y_train)
 
     y_predict = reg.predict(x_test)
+
     df_test['PREDICT'] = y_predict
-    print(np.mean(df_test['REVENUE']))
+    print("linear regression model result")
+    print(np.mean(y_test))
     print(np.mean(df_test['PREDICT']))
+
 
 def get_latest_arpu(month_arpu):
     month_arpu['lag_1'] = month_arpu['arpu'].shift(1)
@@ -103,10 +117,22 @@ def obtain_data():
     print(df_train.columns)
     return df_train, df_test
 
+def prepare_data(df_train, df_test):
+    columns = df_train.columns
+    x_columns = columns[0: -4]
+
+    x_train = df_train.loc[:, x_columns].values
+    y_train = df_train['REVENUE']
+    x_test = df_test.loc[:, x_columns].values
+    y_test = df_test['REVENUE']
+    return x_train, x_test, y_train, y_test
 
 def main():
     df_train, df_test = obtain_data()
-    linear_regression(df_train, df_test)
+    x_train, x_test, y_train, y_test = prepare_data(df_train, df_test)
+    linear_regression(x_train, x_test, y_train, y_test, df_test)
+    ann_model(x_train, x_test, y_train, y_test, df_test)
+
 
 
 if __name__ == '__main__':
