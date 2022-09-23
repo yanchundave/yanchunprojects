@@ -5,7 +5,7 @@ import pickle
 
 
 def read_data():
-    suffix = ['04', '07', '10', '01']
+    suffix = ['04', '07', '10', '12', 'CANDIDATE']
     columns_name = ['USER_ID', 'STARTDATE', 'PLATFORM', 'ATTRIBUTION', 'NETWORK', 'BOD_ACCOUNT_OPEN_USER',
     'BOD_DIRECT_DEPOSIT_USER', 'BANK_CATEGORY', 'HAS_VALID_CREDENTIALS', 'MOST_RECENT_REQUEST_DECLINE',
     'ADVANCE_TAKEN_AMOUNT', 'FIRST_TRANS', 'FREQUENCY', 'T', 'RECENCY', 'MONETARY', 'ACTIVESESSION', 'REVENUE', 'FORECASTDATE']
@@ -44,6 +44,7 @@ def read_data():
         pickle.dump(dftotal, f)
     print("Done")
 
+# PROVIDE THE MONTHLY ARPU VALUE WHICH ARE THE FEATURES FOR THE MODEL
 def arpu():
     sql_str = """
     SELECT

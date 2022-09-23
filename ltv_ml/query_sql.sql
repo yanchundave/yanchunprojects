@@ -451,11 +451,10 @@ PLATFORM,
 ATTRIBUTION,
 NETWORK,
 BOD_ACCOUNT_OPEN_USER,
-BOD_DIRECT_DEPOSIT_USER,
-IS_NEW_USER
+BOD_DIRECT_DEPOSIT_USER
 FROM ANALYTIC_DB.DBT_MARTS.NEW_USER_REATTRIBUTION
 WHERE to_date(PV_TS) >= DATE('2021-01-01')
-AND to_date(PV_TS) < DATE('2022-08-01');
+AND to_date(PV_TS) < DATE('2022-09-01');
 ------- NEW USER YELLOW FEATURE
 
 DROP TABLE IF EXISTS DBT.DEV_YANCHUN_PUBLIC.LTV_USER_2022;
@@ -534,4 +533,64 @@ ON USERS.USER_ID = UW.USER_ID
 LEFT JOIN APPROVED_BANK
 ON USERS.USER_ID = APPROVED_BANK.USER_ID;
 
+
+
+-----user_transaction_2022
+
+DROP TABLE IF EXISTS ACCOUNTING.DBT_LOCAL.USER_TRANSACTION_2022;
+CREATE table ACCOUNTING.DBT_LOCAL.USER_TRANSACTION_2022
+AS
+with user_pv AS
+(
+    SELECT
+    USER_ID,
+    TO_DATE(PV_TS) AS startdate
+    FROM ANALYTIC_DB.DBT_MARTS.NEW_USER_REATTRIBUTION
+    WHERE to_date(PV_TS) >= DATE('2021-01-01')
+
+),
+advance_records AS
+(
+    SELECT
+    TO_VARCHAR(advance_id) AS trans_id,
+    user_pv.USER_ID AS user_id,
+    user_pv.startdate AS startdate,
+    TO_DATE(advance_disbursement_time_utc) AS trans_time,
+    adv_fee_orig + adv_tip_orig AS revenue
+    FROM user_pv
+    LEFT JOIN ACCOUNTING.DBT_PROD.DIM_ADVANCE_FLAT advance
+    ON user_pv.USER_ID = advance.user_id
+),
+overdraft_records AS
+(
+    SELECT
+    overdraft_id AS trans_id,
+    user_pv.USER_ID AS user_id,
+    user_pv.startdate AS startdate,
+    TO_DATE(overdraft_disbursement_time_utc) AS trans_time,
+    overdraft_service_fee_orig +
+    overdraft_express_fee_orig +
+    overdraft_user_tip_orig AS revenue
+    FROM user_pv
+    LEFT JOIN ACCOUNTING.DBT_PROD.DIM_OVERDRAFT_FLAT overdraft
+    ON user_pv.USER_ID = overdraft.user_id
+)
+SELECT * FROM advance_records
+UNION ALL
+SELECT * FROM overdraft_records;
+
+------User happened revenue
+with USERS as
+ (
+   select USER_ID FROM
+ DBT.DEV_YANCHUN_PUBLIC.LTV_USER_2022 WHERE STARTDATE >= DATE('2022-06-01') AND STARTDATE < DATE('2022-09-01')
+ )
+ ,trans as
+ (
+   SELECT users.USER_ID, REVENUE FROM
+   USERS LEFT JOIN
+ ACCOUNTING.DBT_LOCAL.USER_TRANSACTION_2022 TRANS
+   ON USERS.USER_ID = TRANS.USER_ID
+ )
+ SELECT SUM(REVENUE)/COUNT(DISTINCT USER_ID) FROM trans;
 

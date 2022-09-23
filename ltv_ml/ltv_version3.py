@@ -17,6 +17,94 @@ from keras.layers import Dense
 from sklearn.linear_model import LinearRegression, LogisticRegression
 
 channels = ['Adwords', 'Apple Search Ads', 'Facebook', 'Organic', 'Referral', 'Snapchat', 'bytedanceglobal_int']
+
+def split_train_test(df, ratio):
+    shuffle_index = np.random.permutation(len(df))
+    test_size = int(len(df) * ratio)
+    test_index = shuffle_index[:test_size]
+    train_index = shuffle_index[test_size:]
+    return df.iloc[train_index], df.iloc[test_index]
+
+def category_clean(df):
+    for item in category_features:
+        df[item] = df[item].astype(str)
+        df[item].fillna(item+'_None', inplace=True)
+        df.loc[df[item]=='None', [item]] = item + '_None'
+        df[item] = df[item].str.upper()
+    return df
+
+def numeric_clean(df):
+    imputer = SimpleImputer(strategy='median')
+    x = imputer.fit_transform(df)
+    return x
+
+def feature_clean_update(df):
+    df_cat = df.loc[:, category_features]
+    df_cat_update = category_clean(df_cat)
+    df_num = df.loc[:, numeric_features]
+    x_num = numeric_clean(df_num)
+
+    return df_cat_update, x_num
+
+def transform_x(df_cat_update, x_num):
+    cat_encoder = OneHotEncoder(sparse=False, categories='auto')
+    cat_encoder.fit(df_cat_update)
+    array_category = cat_encoder.transform(df_cat_update)
+    category_name = cat_encoder.categories_
+    columns_name = [x for item in category_name for x in item]
+
+    scaler = StandardScaler()
+    scaler.fit(x_num)
+    x = scaler.transform(x_num)
+
+    columns_name += numeric_features
+    x_combine = np.concatenate([array_category, x], axis=1)
+    return scaler, cat_encoder, x_combine, columns_name
+
+def reg_model_analysis(y, y_predict):
+    print("arpu test")
+    print(np.mean(y))
+    print(np.mean(y_predict))
+
+def lreg_model_analysis(y, y_predict):
+    print("retention rate")
+    print(len(y[y==1])/ len(y))
+    print(np.mean(y_predict[:,1]))
+
+def train_model(df):
+    #FOUND 968 duplication due to different bank category
+    df = df.drop_duplicates(subset=['USER_ID'])
+    df = df.fillna({'REVENUE':0})
+    df['LG_REVENUE'] = df['REVENUE'].apply(lambda x: 1 if x > 0 else -1)
+    df_train, df_test = split_train_test(df, 0.2)
+
+    df_train_cat, np_train_numeric = feature_clean_update(df_train)
+    scaler, cat_encoder, x_combine, x_name = transform_x(df_train_cat, np_train_numeric)
+    y_train = df_train['REVENUE']
+    y_train_lg = df_train['LG_REVENUE']
+
+    x_combine = sm.add_constant(x_combine, has_constant='add')
+    reg_model = sm.OLS(y_train, x_combine).fit()
+
+    df_test_cat, np_test_numeric = feature_clean_update(df_test)
+    array_test_category = cat_encoder.transform(df_test_cat)
+    x_test = scaler.transform(np_test_numeric)
+    x_test_combine = np.concatenate([array_test_category, x_test], axis=1)
+    x_test_combine =sm.add_constant(x_test_combine)
+    y_test = df_test['REVENUE']
+    y_test_lg = df_test['LG_REVENUE']
+
+
+    y_test_predict = reg_model.predict(x_test_combine)
+    reg_model_analysis(y_test, y_test_predict)
+
+    lreg_model = LogisticRegression(random_state=0).fit(x_combine, y_train_lg)
+    y_test_lg_pred = lreg_model.predict_proba(x_test_combine)
+    lreg_model_analysis(y_test_lg, y_test_lg_pred)
+
+    return scaler, cat_encoder, reg_model, lreg_model
+
+
 def feature_clean(df, numerical_columns, categorical_columns=None):
     # obtain categorical_columns
     columns_name = []
@@ -54,8 +142,8 @@ def feature_clean(df, numerical_columns, categorical_columns=None):
 
 def nn_model():
     model = Sequential()
-    model.add(Dense(24, input_dim=21, activation='relu'))
-    model.add(Dense(12, activation='linear'))
+    model.add(Dense(36, input_dim=35, activation='relu'))
+    model.add(Dense(18, activation='linear'))
     model.add(Dense(1, activation='linear'))
     model.compile(loss='mse', optimizer='adam', metrics=['mse', 'mae'])
     return model
@@ -87,19 +175,6 @@ def call_model(df, df_ltv):
     x_name, x_train, x_test, userid_train, userid_test, y_train, y_test = train_test_data(df)
     #rnn_model(x_name, x_train, x_test, userid_train, userid_test, y_train, y_test, df, df_ltv)
     linear_statsmodels(x_name, x_train, x_test, userid_train, userid_test, y_train, y_test, df, df_ltv)
-
-def read_data():
-    # Read Jing's query mainly for bank infortion
-    Jing_query = """
-    select * from DBT.DEV_JGAN_PUBLIC.USER_DATA_2022 WHERE ADVANCE_TAKEN_USER=1
-    """
-    result = read_from_database(Jing_query)
-    df = pd.DataFrame(result)
-    #Read df_x_y.csv (with std variation)
-    df_x_y = pd.read_csv(datafile_path + "df_x_y.csv", header=0)
-    df_total = pd.merge(df_x_y, df, on=['userid'])
-    with open(datafile_path + "df_total.pk", 'wb') as f:
-        pickle.dump(df_total, f)
 
 def simple_output(df_test):
     monthlist = list(set(df_test['month']))
@@ -204,42 +279,167 @@ def linear_regression_monthly(df, df_ltv):
         linear_regression(df_tmp, df_ltv)
 
 def add_seasonality(df):
-    df['month'] = df['startdate'].apply(lambda x: int(str(x)[5:7]))
-    df['sine_month'] = df['month'].apply(lambda x: math.sin(2 * math.pi * x / 12))
-    df['cosine_month'] = df['month'].apply(lambda x: math.cos(2 * math.pi * x / 12))
+    df['MONTH'] = df['STARTDATE'].apply(lambda x: int(str(x)[5:7]))
+    df['SINE_MONTH'] = df['MONTH'].apply(lambda x: math.sin(2 * math.pi * x / 12))
+    df['COSINE_MONTH'] = df['MONTH'].apply(lambda x: math.cos(2 * math.pi * x / 12))
     return df
 
-def update_network(df):
-    df.loc[~df['NETWORK'].isin(channels), ['NETWORK']] = 'NETWORK_OTHERS'
-    return df
+def calculate_std(item):
+    if item is None:
+        return -1
+    splits = item.strip().split(",")
+    if len(splits) >= 2:
+        values = [float(x) for x in splits]
+        return np.std(values) / np.mean(values)
+    else:
+        return 0
 
+def calculate_std_derived(item):
+    if item is None:
+        return -1
+    splits = item.strip().split(",")
+    if len(splits) >= 3:
+        values = [float(x) for x in splits]
+        values.sort()
+        values_update = [y - x for x, y in zip(values, values[1: ])]
+        return np.std(values_update) / np.mean(values_update)
+
+    else:
+        return 0
+
+def calculate_listlength(item):
+    if item is None:
+        return -1
+    splits = item.strip().split(",")
+    return len(splits)
+
+"""
 def clean_data(df):
     x_value, x_name = feature_clean(df, numeric_features, category_features)
     y_value = df['revenue'].values
     x_userid = df.loc[:, ['userid', 'startdate']].values
     x_train, x_test, userid_train, userid_test, y_train, y_test = split_train_test_two(x_value, y_value, 0.2, x_userid)
+"""
+
+def feature_derived(df):
+    df = add_seasonality(df)
+    df.loc[~df['NETWORK'].isin(channels), ['NETWORK']] = 'NETWORK_OTHERS'
+    df['TIMEDIFF_STD'] = df['TRANS_LIST'].apply(lambda x: calculate_std_derived(x))
+    df['MONETARY_STD'] = df['MONETARY_LIST'].apply(lambda x: calculate_std(x))
+    df['SESSION_STD'] = df['SESSION_LIST'].apply(lambda x: calculate_std(x))
+    df['ACTIVEMONTH'] = df['SESSION_LIST'].apply(lambda x: calculate_listlength(x))
+    return df
+
+
+def read_data():
+    with open(datafile_path + "longterm_training.pk", 'rb') as f:
+        df_train = pickle.load(f)
+    df_train_update = feature_derived(df_train)
+
+    with open(datafile_path + "longterm_forecast.pk", 'rb') as f:
+        df_forecast = pickle.load(f)
+    df_forecast_update = feature_derived(df_forecast)
+
+    return df_train_update, df_forecast_update
+
+
+def dump_pickle(df, dfname):
+    with open(datafile_path + dfname, "wb") as f:
+        pickle.dump(df, f)
+
+
+def load_pickle(dfname):
+    with open(datafile_path + dfname, "rb") as f:
+        df = pickle.load(f)
+    return df
+
+def forecast_model(scaler, onehotconverter, reg_model, lreg_model,  df):
+    df = df.drop_duplicates(subset=['USER_ID'])
+
+    df_cat, np_numeric = feature_clean_update(df)
+    scaler_new, cat_encoder_new, x_combine, x_name = transform_x(df_cat, np_numeric)
+    x_combine =sm.add_constant(x_combine)
+
+    y_predict = reg_model.predict(x_combine)
+    print("forecast arpu is")
+    print(np.mean(y_predict))
+
+    array_test_category = onehotconverter.transform(df_cat)
+    x = scaler.transform(np_numeric)
+    x_combine_lg = np.concatenate([array_test_category, x], axis=1)
+    x_combine_lg = sm.add_constant(x_combine_lg, has_constant='add')
+    y_lg_pred = lreg_model.predict_proba(x_combine_lg)
+    print("forecast retention is ")
+    print(np.mean(y_lg_pred[:,1]))
+    df['ARPU_PREDICT'] = y_predict
+    df['RETENTION_PREDICT'] = y_lg_pred[:,1]
+    return df
+
+def forecast_rnn_model(scaler, onehotconverter, rnn_model, lreg_model,  df):
+    df = df.drop_duplicates(subset=['USER_ID'])
+
+    df_cat, np_numeric = feature_clean_update(df)
+    array_test_category = onehotconverter.transform(df_cat)
+    x = scaler.transform(np_numeric)
+    x_combine = np.concatenate([array_test_category, x], axis=1)
+
+    y_predict = rnn_model.predict(x_combine)
+    print("forecast arpu is")
+    print(np.mean(y_predict))
+
+    y_lg_pred = lreg_model.predict_proba(x_combine)
+    print("forecast retention is ")
+    print(np.mean(y_lg_pred[:,1]))
+    df['ARPU'] = y_predict
+    df['RETENTION'] = y_lg_pred[:,1]
+    return df
+
+def train_rnn_model(df):
+    #FOUND 968 duplication due to different bank category
+    df = df.drop_duplicates(subset=['USER_ID'])
+    df = df.fillna({'REVENUE':0})
+    df['LG_REVENUE'] = df['REVENUE'].apply(lambda x: 1 if x > 0 else -1)
+    df_train, df_test = split_train_test(df, 0.2)
+
+    df_train_cat, np_train_numeric = feature_clean_update(df_train)
+    scaler, cat_encoder, x_combine, x_name = transform_x(df_train_cat, np_train_numeric)
+    y_train = df_train['REVENUE']
+    y_train_lg = df_train['LG_REVENUE']
+
+    df_test_cat, np_test_numeric = feature_clean_update(df_test)
+    array_test_category = cat_encoder.transform(df_test_cat)
+    x_test = scaler.transform(np_test_numeric)
+    x_test_combine = np.concatenate([array_test_category, x_test], axis=1)
+    y_test = df_test['REVENUE']
+    y_test_lg = df_test['LG_REVENUE']
+
+    rnn_model = nn_model()
+    rnn_model.fit(x_combine, y_train, epochs=30, batch_size=75, validation_data=(x_test_combine, y_test))
+    y_test_pred = rnn_model.predict(x_test_combine)
+    reg_model_analysis(y_test, y_test_pred)
+
+    lreg_model = LogisticRegression(random_state=0).fit(x_combine, y_train_lg)
+    y_test_lg_pred = lreg_model.predict_proba(x_test_combine)
+    lreg_model_analysis(y_test_lg, y_test_lg_pred)
+
+    return scaler, cat_encoder, rnn_model, lreg_model
 
 def main():
-    #read_data()
-    with open(datafile_path + "longtermuserfile.pk", 'rb') as f:
-        df = pickle.load(f)
-    df = df.drop_duplicates(['userid'])
-    dfupdate = add_seasonality(df)
+    #dftrain, dfforecast = read_data()
+    #dump_pickle(dftrain, "dftrain.pk")
+    #dump_pickle(dfforecast, "dfforecast.pk")
 
+    dftrain = load_pickle("dftrain.pk")
+    dfforecast = load_pickle("dfforecast.pk")
 
-    dfupdate['startmonth'] = dfupdate['startdate'].str.slice(0, 7)
-    p_model_2 = linear_statsmodels(dfupdate)
-
-    #dfupdate_1 = dfupdate.loc[dfupdate['startmonth'].isin(['2021-12']),:]
-    # read ltv value
-    #df_ltv = pd.read_csv("/Users/yanchunyang/Documents/datafiles/ltv/" + "dftotal.csv", header=0)
-    #print(df_ltv.shape)
-    #p_model_1 = linear_regression(dfupdate, df_ltv)
-    #p_model_2 = linear_statsmodels(dfupdate)
-    #rnn_model(dfupdate, df_ltv)
-    #call_model(dfupdate, df_ltv)
-    #compare_output(p_model_1, p_model_2)
-    #linear_regression_monthly(dfupdate, df_ltv)
+    scaler, onehotconverter, reg_model, lreg_model = train_model(dftrain)
+    dfforecast_update = forecast_model(scaler, onehotconverter, reg_model, lreg_model,  dfforecast)
+    dfforecast_update.to_csv(datafile_path + "dfforecast_update.csv")
+    """
+    scaler, onehotconverter, rnn_model, lreg_model = train_rnn_model(dftrain)
+    dfforecast_update = forecast_rnn_model(scaler, onehotconverter, rnn_model, lreg_model,  dfforecast)
+    dfforecast_update.to_csv(datafile_path + "dfforecast_update_1.csv")
+    """
     print("Done")
 
 if __name__ == '__main__':
