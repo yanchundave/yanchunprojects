@@ -14,6 +14,7 @@ def read_train_data():
     SELECT *
     FROM ACCOUNTING.DBT_LOCAL.LTV_STATS_INPUT
     WHERE FORECASTDATE = DATEADD('month', -6, DATE_TRUNC('month', CURRENT_DATE()))
+    AND (FREQUENCY = 0 OR (FREQUENCY > 0 AND RECENCY > 0))
     """
     df = pd.read_sql_query(sql_str, con)
     return df
@@ -23,6 +24,7 @@ def read_forecast_data():
     SELECT *
     FROM ACCOUNTING.DBT_LOCAL.LTV_STATS_INPUT
     WHERE FORECASTDATE = DATE_TRUNC('month', CURRENT_DATE())
+    AND (FREQUENCY = 0 OR (FREQUENCY > 0 AND RECENCY > 0))
     """
     df = pd.read_sql_query(sql_str, con)
     return df

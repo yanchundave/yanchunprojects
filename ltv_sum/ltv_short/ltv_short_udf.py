@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import OneHotEncoder, MinMaxScaler
+from sklearn.preprocessing import OneHotEncoder, MinMaxScaler, StandardScaler
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from ltv_short_global import *
 import math
@@ -49,7 +49,7 @@ def transform_x(df):
     category_name = cat_encoder.categories_
     columns_name = [x for item in category_name for x in item]
 
-    scaler = MinMaxScaler(feature_range=(0, 1))
+    scaler = StandardScaler()
     scaler.fit(df_num.values)
     x = scaler.transform(df_num.values)
 
@@ -70,11 +70,17 @@ def transform_x_forecast(df, scaler):
     category_name = cat_encoder.categories_
     columns_name = [x for item in category_name for x in item]
 
-    x = scaler.transform(df_num.values)
+    scaler_new = StandardScaler()
+    x = scaler_new.fit_transform(df_num.values)
+
+    x_lr = scaler.transform(df_num.values)
 
     columns_name += numeric_features
     x_combine = np.concatenate([array_category, x, np.array(df['REVENUE']).reshape([-1, 1]), np.array(df['LG_REVENUE']).reshape([-1, 1])], axis=1)
     dfupdate = pd.DataFrame(x_combine, index=df['USER_ID'], columns=columns_name + ['REVENUE', 'LG_REVENUE']).reset_index()
 
-    return dfupdate
+    x_combine_lr = np.concatenate([array_category, x_lr, np.array(df['REVENUE']).reshape([-1, 1]), np.array(df['LG_REVENUE']).reshape([-1, 1])], axis=1)
+    dfupdate_lr = pd.DataFrame(x_combine_lr, index=df['USER_ID'], columns=columns_name + ['REVENUE', 'LG_REVENUE']).reset_index()
+
+    return dfupdate, dfupdate_lr
 

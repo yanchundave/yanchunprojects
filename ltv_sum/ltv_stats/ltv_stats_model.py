@@ -40,6 +40,6 @@ def ltv_stats_model(df):
         dfone['T_VALUE'] = dfone['PRED_NUM'] * dfone['MONETARY']
 
         dftotal = pd.concat([dfupdate, dfone], axis=0)
-        return dftotal.loc[:, ['USER_ID', 'T_VALUE', 'PRED_NUM', 'EXPECTED_MONETARY']]
+        return dftotal.loc[:, ['USER_ID', 'T_VALUE', 'PRED_NUM', 'EXPECTED_MONETARY', 'PREDICT_CLV']]
     except:
         return None

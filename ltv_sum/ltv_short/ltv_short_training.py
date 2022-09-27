@@ -20,6 +20,7 @@ def read_train_data():
     FROM ACCOUNTING.DBT_LOCAL.LTV_SHORT_INPUT
     WHERE FORECASTDATE < DATE_TRUNC('month', CURRENT_DATE())
     AND FIRST_TRANS IS NOT NULL
+    AND (FREQUENCY = 0 OR (FREQUENCY > 0 AND RECENCY > 0))
     """
     df = pd.read_sql_query(sql_str, con)
     return df
@@ -30,6 +31,7 @@ def read_forecast_data():
     FROM ACCOUNTING.DBT_LOCAL.LTV_SHORT_INPUT
     WHERE FORECASTDATE = DATE_TRUNC('month', CURRENT_DATE())
     AND FIRST_TRANS IS NOT NULL
+    AND (FREQUENCY = 0 OR (FREQUENCY > 0 AND RECENCY > 0))
     """
     df = pd.read_sql_query(sql_str, con)
     return df
@@ -67,11 +69,12 @@ def forecast_model(df, reg, lreg, featurecolumn, scaler):
     df = df.drop_duplicates(subset=['USER_ID'])
 
     df = feature_derived(df)
-    dfupdate = transform_x_forecast(df, scaler)
+    dfupdate, dfupdate_lr = transform_x_forecast(df, scaler)
 
     x_values = dfupdate.loc[:, featurecolumn].values
+    x_values_lr = dfupdate_lr.loc[:, featurecolumn].values
     df['PREDICT'] = reg.predict(x_values)
-    df[['LG_PREDICT_CHURN', 'LG_PREDICT_RETENTION']] = lreg.predict_proba(x_values)
+    df[['LG_PREDICT_CHURN', 'LG_PREDICT_RETENTION']] = lreg.predict_proba(x_values_lr)
 
     return df
 
