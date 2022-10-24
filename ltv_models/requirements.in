@@ -1,0 +1,9 @@
+--extra-index-url https://us-central1-python.pkg.dev/datasci-10a8/python-packages/simple/
+davesci>=0.3.1
+pandas>=1.4.3
+Lifetimes==0.11.3
+statsmodels==0.13.2
+scikit-learn==1.1.2
+fsspec>=2022.7.1
+gcsfs>=2022.7.1
+click>=8.1.3
