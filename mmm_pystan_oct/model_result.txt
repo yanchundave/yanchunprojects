@@ -1,0 +1,3 @@
+Get y prediction for the model
+[[1.         0.89111613]
+ [0.89111613 1.        ]]
