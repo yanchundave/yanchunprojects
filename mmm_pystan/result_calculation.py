@@ -1,13 +1,17 @@
+import numpy as np
+import pandas as pd
+from global_variable import *
+import math
+
+
 """
 This file is to support result_analysis.py.
 It provides the necessary calculation functions to draw the graph
 """
 
-import numpy as np
-import pandas as pd
-from global_variable import * 
-import math
-
+"""
+The below functions are for the first analysis function to get_prediction_from_samples
+"""
 
 def moving_average(a, n):  #For keeping this script independently and conviniently, duplicate this function
     '''
@@ -19,10 +23,10 @@ def moving_average(a, n):  #For keeping this script independently and convinient
     '''
     ret = np.cumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
-    return ret[n-1:] / n 
+    return ret[n-1:] / n
 
 
-def y_fitted_from_bayesian(df_parameter):
+def y_fitted_from_bayesian(df_parameter, Kl):
     '''
     Returns the prediction of y from the posterior distribution
             Parameters:
@@ -36,7 +40,7 @@ def y_fitted_from_bayesian(df_parameter):
     return np.mean(y_values, axis=0)
 
 
-def get_prediction_from_samples(df_parameter, spending, basic, newuser, spending_origin):
+def get_prediction_from_samples(df_parameter, newuser,  Kl):
     '''
     Calculated R-squared of prediciton and the actual value
             Parameters:
@@ -46,18 +50,20 @@ def get_prediction_from_samples(df_parameter, spending, basic, newuser, spending
                     Print R-squared of part of list with part of actual value (To test train and test dataset)
     '''
     y = moving_average(newuser[:-1], 7)
-    y_from_model = y_fitted_from_bayesian(df_parameter)
+    y_from_model = y_fitted_from_bayesian(df_parameter, Kl)
     print("y directly from model")
-    print(np.square(np.corrcoef(y_from_model, y)))
-    print(np.square(np.corrcoef(y_from_model[0:M], y[0:M])))
-    print(np.square(np.corrcoef(y_from_model[M:], y[M:])))
+    r_square = np.square(np.corrcoef(y_from_model, y))
+    #print(np.square(np.corrcoef(y_from_model[0:kl], y[0:kl])))
+    with open("model_result.txt", 'w') as f:
+        f.write("Get y prediction for the model" + "\n")
+        f.write(str(r_square) + "\n")
 
 
 """
 Calculate ROAS
 """
 
-def get_roas(y_origin, remove_list, spending_list):
+def get_roas(y_origin, remove_list, spending_list, Kl, T):
     '''
     Returns the channels' weekly average ROAS
             Parameters:
@@ -72,19 +78,19 @@ def get_roas(y_origin, remove_list, spending_list):
     newuser_origin = np.exp(y_origin) * y_constant
     newuser_remove = np.exp(remove_list) * y_constant
     y_diff = newuser_origin - newuser_remove
-    day_index = np.arange(1, Kl+1)   
-    datetimes = pd.to_datetime(day_index, unit='D', origin=pd.Timestamp(origin_date)) #After moving average, the data is from Jan 8
+    day_index = np.arange(1, Kl+1)
+    datetimes = pd.to_datetime(day_index, unit='D', origin=pd.Timestamp(ORIGIN_DATE)) #After moving average, the data is from Jan 8
     df = pd.DataFrame(y_diff, columns = ['newuser'])
     df['datetime'] = datetimes
-    df['spending'] = spending_update 
+    df['spending'] = spending_update
     df['weekly'] = df['datetime'].dt.strftime('%Y-%U')
     df_weekly_roas = df.groupby(['weekly']).agg({'spending':'sum', 'newuser':'sum', 'datetime':'min'}).reset_index()
     y_value = np.array([max(x, 0) for x in df_weekly_roas['newuser']])
-    df_weekly_roas['weekly_roas'] = y_value/ df_weekly_roas['spending']   
+    df_weekly_roas['weekly_roas'] = y_value/ df_weekly_roas['spending']
     return df_weekly_roas
 
 
-def get_roas_accumulate(y_origin, remove_list, spending_list):
+def get_roas_accumulate(y_origin, remove_list, spending_list, T):
     '''
     Return the channel's roas trending from beginning to end
             Parameters:
@@ -101,7 +107,7 @@ def get_roas_accumulate(y_origin, remove_list, spending_list):
     y_diff = newuser_origin - newuser_remove
     y_cum = np.cumsum(y_diff)
     spending_cum = np.cumsum(spending_update)
-    roas = y_cum / spending_cum 
+    roas = y_cum / spending_cum
     roas = y_diff / (spending_update + 0.0001)  # in case 0 spending_update
     return roas
 
@@ -128,7 +134,7 @@ def calcualte_droping_rate(origin, remove):
 Calculate Saturation
 """
 
-def get_coes(df_parameter):
+def get_coes(df_parameter, Km, L):
     '''
     Return coes for each channel. Assume the daily spending is same, its actual spending's effect should be multipled by a coefficient.
             Parameters:
@@ -151,7 +157,7 @@ def get_coes(df_parameter):
     return coes
 
 
-def actual_all_data_saturation(spending_origin, df_parameter):
+def actual_all_data_saturation(spending_origin, df_parameter, Km, L):
     '''
     This function is to get the data for draw saturation curve with actual spending labelled on the graph.
     Since the carryover effect exists, the actual spending's effect need multiple an effect coefficient.
@@ -172,13 +178,13 @@ def actual_all_data_saturation(spending_origin, df_parameter):
     maxvalue_each_network = np.max(spending_origin, axis=0)
     meanvalue_each_network = np.mean(spending_origin, axis=0)
 
-    coes = get_coes(df_parameter)
+    coes = get_coes(df_parameter, Km, L)
 
     maxtotal = np.max(maxvalue_each_network)
     mintotal = np.min(minvalue_each_network)
     spending_diff = (maxtotal * 2 - mintotal) / 1000
     spending_list = np.array([mintotal + t * spending_diff for t in range(0, 1000)])
-   
+
     results = [] #y_value
     current_spending = []
 
@@ -194,7 +200,7 @@ def actual_all_data_saturation(spending_origin, df_parameter):
     return results, spending_list, current_spending
 
 
-def actual_data_saturation(spending_origin, df_parameter):
+def actual_data_saturation(spending_origin, df_parameter, Km, L):
     '''
     Prepare the dataset for saturation curves.
             Parameters:
@@ -210,7 +216,7 @@ def actual_data_saturation(spending_origin, df_parameter):
     beta_m_values = df_parameter.loc[:, beta_m_columns].values
     beta_m = np.mean(beta_m_values, axis=0)
 
-    coes = get_coes(df_parameter)
+    coes = get_coes(df_parameter, Km, L)
     minvalue_each_network = np.min(spending_origin, axis=0)
     maxvalue_each_network = np.max(spending_origin, axis=0)
 
@@ -231,7 +237,7 @@ def actual_data_saturation(spending_origin, df_parameter):
         tmp = np.sort(spending_origin[:, i])
         network_current = [np.mean(tmp), np.percentile(tmp, 2.5), np.percentile(tmp, 97.5)]
         current_spending.append(network_current)
-    
+
     return results, spending_total, current_spending
 
 
@@ -244,25 +250,25 @@ I will update the model dependent variable to calculate the contribution for con
 The ratio of two experiments will show each channels conversion rate
 
 """
-def calculate_prediction_and_prediction_removed(df_parameter, label="onedave"):
+def calculate_prediction_and_prediction_removed(df_parameter, Km, Kl):
     '''
-    This function is to read data from test result. 
+    This function is to read data from test result.
     We can obtain the prediction of all channels and also prediction after removing some channel
     The difference is the contribution of some channel and save to hardware for later comparision.
     '''
-    y_from_model = y_fitted_from_bayesian(df_parameter)
+    y_from_model = y_fitted_from_bayesian(df_parameter, Kl)
     remove_result = []
     for i in range(1, Km+1):
         roas_columns = ["y_remove." + str(i) + "." + str(j) for j in range(1, Kl + 1)]
         y_values = df_parameter.loc[:, roas_columns].values
         remove_result.append(np.mean(y_values, axis=0))
-    
+
     y_total = y_from_model.reshape((-1,1))
     y_remove = np.array(remove_result).T
     newuser_origin = np.exp(y_total) * y_constant
     newuser_remove = np.exp(y_remove) * y_constant
     y_diff = newuser_origin - newuser_remove
-   
+
     """
     result_df = pd.DataFrame(y_diff, columns = media_list)
     result_df.to_csv(datafile_path + label + ".csv")

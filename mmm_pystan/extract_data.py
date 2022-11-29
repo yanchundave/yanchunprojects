@@ -1,9 +1,13 @@
 import jaydebeapi as jay
-import os
-import numpy as np 
-import pandas as pd 
+import numpy as np
+import pandas as pd
 from global_variable import *
+from datetime import datetime, timedelta
+from mmm_udf import pivot_table
 
+"""
+Step 1: to extract input table that MMM needed
+"""
 
 def read_from_snowflake(sql_str):
     with open('/Users/yanchunyang/pwd/snowflake.passphrase', 'r') as f:
@@ -32,82 +36,112 @@ def read_from_snowflake(sql_str):
     return result
 
 
-def extract_spending_data():
-    sql_str = f"""
-    select date(SPEND_DATE_PACIFIC_TIME), network, PLATFORM, sum(spend)
-    from ANALYTIC_DB.DBT_MARTS.MARKETING_SPEND 
-    where SPEND_DATE_PACIFIC_TIME>='{origin_date}'
-    AND SPEND_DATE_PACIFIC_TIME <= '{end_date}'
-    group by 1, 2, 3
-    order by 1, 2, 3;
+def extract_spending_data(origin_date, end_date):
     """
+        Extract channel and platform spending data. Independent variables in the model.
+    """
+
+    sql_str = f"""
+    SELECT
+        DATE(SPEND_DATE_PACIFIC_TIME) AS SPENDDATE,
+        NETWORK,
+        PLATFORM,
+        SUM(SPEND) AS TOTALSPEND
+    FROM ANALYTIC_DB.DBT_MARTS.MARKETING_SPEND
+    WHERE SPEND_DATE_PACIFIC_TIME>= DATE('{origin_date}')
+    AND SPEND_DATE_PACIFIC_TIME <= DATE('{end_date}')
+    GROUP BY 1, 2, 3
+    ORDER BY 1, 2, 3;
+    """
+
     results = read_from_snowflake(sql_str)
     df = pd.DataFrame(results, columns=['date', 'channel', 'platform', 'spending'])
     values = {'platform': 'unknown', 'spending':0}
     df = df.fillna(value=values)
+    # This file is for R code
     df.to_csv(datafile_path + "platform_raw.csv")
+    return df
 
-def extract_user_data():
+
+def extract_user_data(origin_date, end_date, user_type):
+    """
+        Extract advance users or one-month revenue after PV. Dependent variables in the model.
+    """
+    # One dave query which has be degenerated. It was used in MMM version 1.
     sql_str_onedave = f"""
-    SELECT 
-    LEFT(convert_timezone('UTC','America/Los_Angeles',PV_TS::timestamp_ntz) , 10) AS date, 
-    SUM(case when PV_TS is not null then 1 else 0 end) AS PV
+    SELECT
+        LEFT(CONVERT_TIMEZONE('UTC','America/Los_Angeles',PV_TS::timestamp_ntz) , 10) AS date,
+        SUM(CASE WHEN PV_TS IS NOT NULL THEN 1 ELSE 0 END) AS PV
     FROM ANALYTIC_DB.DBT_MARTS.NEW_USER_REATTRIBUTION
-    WHERE to_date(convert_timezone('UTC','America/Los_Angeles',PV_TS::timestamp_ntz)) >='{origin_date}'
-    AND to_date(convert_timezone('UTC','America/Los_Angeles',PV_TS::timestamp_ntz))<='{end_date}'
+    WHERE TO_DATE(CONVERT_TIMEZONE('UTC','America/Los_Angeles',PV_TS::timestamp_ntz)) >='{origin_date}'
+          AND TO_DATE(CONVERT_TIMEZONE('UTC','America/Los_Angeles',PV_TS::timestamp_ntz))<='{end_date}'
     GROUP BY 1
     ORDER BY 1;
     """
+
+    # advance user query
     sql_str_advance =f"""
-    SELECT 
-    LEFT(convert_timezone('UTC','America/Los_Angeles',PV_TS::timestamp_ntz) , 10) AS date, 
-    SUM(case when ADVANCE_TAKEN_USER is not null then 1 else 0 end) AS PV
+    SELECT
+        LEFT(CONVERT_TIMEZONE('UTC','America/Los_Angeles',PV_TS::timestamp_ntz) , 10) AS date,
+        SUM(CASE WHEN ADVANCE_TAKEN_USER IS NOT NULL THEN 1 ELSE 0 END) AS PV
     FROM ANALYTIC_DB.DBT_MARTS.NEW_USER_REATTRIBUTION
-    WHERE to_date(convert_timezone('UTC','America/Los_Angeles',PV_TS::timestamp_ntz)) >='{origin_date}'
-    AND to_date(convert_timezone('UTC','America/Los_Angeles',PV_TS::timestamp_ntz))<='{end_date}'
+    WHERE TO_DATE(CONVERT_TIMEZONE('UTC','America/Los_Angeles',PV_TS::timestamp_ntz)) >='{origin_date}'
+          AND TO_DATE(CONVERT_TIMEZONE('UTC','America/Los_Angeles',PV_TS::timestamp_ntz))<='{end_date}'
     GROUP BY 1
     ORDER BY 1;
     """
     sql_str = sql_str_advance if user_type == 'advance' else sql_str_onedave
     results = read_from_snowflake(sql_str)
-        
+
     df = pd.DataFrame(results, columns=['date', 'PV'])
     df = df.fillna(0)
     df.to_csv(datafile_path + "platform_user_advance.csv")
     print("Done")
 
-def extract_revenue_data():
+
+def extract_revenue_data(origin_date, end_date):
     sql_str = f"""
-    with user_pv as 
+    WITH user_pv AS
     (
-    SELECT USER_ID, to_date(PV_TS) as starttime, dateadd(day, 30, to_date(PV_TS)) as endtime
-    FROM ANALYTIC_DB.DBT_marts.new_user_reattribution 
-    WHERE to_date(PV_TS) >= '{origin_date}' 
-    AND to_date(PV_TS) <= '{end_date}'
+        SELECT
+            USER_ID,
+            TO_DATE(PV_TS) AS starttime,
+            DATEADD(day, 30, TO_DATE(PV_TS)) AS endtime
+        FROM ANALYTIC_DB.DBT_marts.new_user_reattribution
+        WHERE TO_DATE(PV_TS) >= '{origin_date}'
+              AND TO_DATE(PV_TS) <= '{end_date}'
     ),
-    advance_revenue as 
+    advance_revenue AS
     (
-    SELECT user_pv.starttime as datetime, revenue.USER_ID, PLEDGED_ADVANCE_REVENUE as total
-    FROM ANALYTIC_DB.DBT_metrics.pledged_advance_revenue revenue
-    JOIN user_pv 
-    ON revenue.USER_ID = user_pv.USER_ID
-    AND revenue.DISBURSEMENT_DS_PST >= user_pv.starttime and revenue.DISBURSEMENT_DS_PST <= user_pv.endtime
-    ), 
-    o2_revenue as 
-    (
-    SELECT user_pv.starttime as datetime, o2.USER_ID, PLEDGED_OVERDRAFT_TIP + PLEDGED_OVERDRAFT_EXPRESS_FEE + PLEDGED_OVERDRAFT_SERVICE_FEE as total
-    FROM ANALYTIC_DB.DBT_metrics.o2_revenue o2
-    JOIN user_pv
-    ON o2.USER_ID = user_pv.USER_ID
-    AND o2.EVENT_DS >= user_pv.starttime AND o2.EVENT_DS <= user_pv.endtime  
+        SELECT
+            user_pv.starttime AS datetime,
+            revenue.USER_ID,
+            revenue.PLEDGED_ADVANCE_REVENUE AS total
+        FROM ANALYTIC_DB.DBT_metrics.pledged_advance_revenue revenue
+        JOIN user_pv
+        ON revenue.USER_ID = user_pv.USER_ID
+            AND revenue.DISBURSEMENT_DS_PST >= user_pv.starttime
+            AND revenue.DISBURSEMENT_DS_PST <= user_pv.endtime
     ),
-    total_revenue as 
+    o2_revenue as
     (
-    SELECT datetime, USER_ID, total FROM advance_revenue
-    UNION
-    SELECT datetime, USER_ID, total FROM o2_revenue
+        SELECT
+            user_pv.starttime AS datetime,
+            o2.USER_ID,
+            o2.PLEDGED_OVERDRAFT_TIP + o2.PLEDGED_OVERDRAFT_EXPRESS_FEE + o2.PLEDGED_OVERDRAFT_SERVICE_FEE AS total
+        FROM ANALYTIC_DB.DBT_metrics.o2_revenue o2
+        JOIN user_pv
+        ON o2.USER_ID = user_pv.USER_ID
+           AND o2.EVENT_DS >= user_pv.starttime
+           AND o2.EVENT_DS <= user_pv.endtime
+    ),
+    total_revenue as
+    (
+        SELECT datetime, USER_ID, total FROM advance_revenue
+        UNION
+        SELECT datetime, USER_ID, total FROM o2_revenue
     )
-    SELECT datetime, SUM(total) as sumtotal
+    SELECT datetime, SUM(total) AS sumtotal
     FROM total_revenue
     GROUP BY datetime
     ORDER BY datetime;
@@ -118,38 +152,41 @@ def extract_revenue_data():
     df.to_csv(datafile_path + "total_revenue.csv")
     print("Done")
 
-def pivot_table(df, network):
-    dfupdate = pd.pivot_table(df, columns=['platform'], index=['date'], 
-        values=['spending'], aggfunc='sum', fill_value=0)
-    dfupdate.columns = [network + '_' + x[0] + '_' + x[1] for x in dfupdate.columns]
-    return dfupdate  
 
-def convert_data():
-    df = pd.read_csv(datafile_path + "platform_raw.csv", header=0)
+def convert_data(df):
+    """
+        Pivot platform_raw dataset and save the basic format for further analysis.
+    """
+
     dfupdate = df.loc[:, ["date", "channel", "platform", "spending"]]
-    dfupdate['channel_update'] = dfupdate['channel'].astype(str) + "_" + dfupdate["platform"]
-    dfupdate['channel'] = dfupdate['channel_update'].str.replace(" ", "_")
+
+    # To channel and platform combination to remove the ambiguity
+    dfupdate['channel'] = dfupdate['channel'].astype(str) + "_" + dfupdate["platform"]
     print(dfupdate.columns)
+
     df_1 = pd.pivot_table(dfupdate, columns=['channel'], index=['date'], values=['spending'], aggfunc='sum', fill_value=0)
-    df_1.columns = [x[1] for x in df_1.columns]
+    df_1.columns = [x[1].replace(" ", "_") for x in df_1.columns]
     df_1 = df_1.reset_index()
+
     df_1.to_csv(datafile_path + "channel_spending_raw.csv")
-    """
-    results = []
-    for i, item in enumerate(channels):
-        results.append(pivot_table(df.loc[df['channel'] == item, :], item))
-    df_update = pd.concat(results, axis=1)
-    df_update = df_update.reset_index()
-    df_update.to_csv(datafile + "channel_spending_raw.csv")
-    """
+    print("convert table done")
+
 
 def main():
-    extract_spending_data()
-    convert_data()
-    if flag == 1:
-        extract_user_data()
+    origin_date = '2022-01-01'
+    # If use revenue as the dependent variable, we have to leave one month to collect revenue for a better estimation
+    end_date = datetime.today() - timedelta(days=32)
+    # define user_type to set user to advance users
+    user_type = 'advance'
+
+    df = extract_spending_data(origin_date, end_date)
+    convert_data(df)
+
+    if FLAG == 1:
+        extract_user_data(origin_date, end_date, user_type)
     else:
-        extract_revenue_data()
+        extract_revenue_data(origin_date, end_date)
+
 
 if __name__ == '__main__':
     main()

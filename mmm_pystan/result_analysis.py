@@ -1,16 +1,10 @@
-"""This is result analysis code snippet. It is after traning part.
-
-The input data are spending origin, scaled spending, scaled basic, scaled new users and model result.
-"""
-
-
-import numpy as np 
-import pandas as pd 
+import numpy as np
+import pandas as pd
 import math
-import matplotlib.pyplot as plt 
-from sklearn import metrics 
-import statsmodels.api as sm 
-import pickle 
+import matplotlib.pyplot as plt
+from sklearn import metrics
+import statsmodels.api as sm
+import pickle
 from collections import defaultdict
 import seaborn as sns
 from datetime import datetime
@@ -18,6 +12,13 @@ from global_variable import *
 from result_calculation import *
 from result_graph import *
 from result_others import *
+
+
+"""
+Step 4: This is result analysis code snippet. It is after traning part.
+
+The input data are spending origin, scaled spending, scaled basic, scaled new users and model result.
+"""
 
 
 def read_data():
@@ -43,7 +44,7 @@ def read_data():
 
 def read_parameters():
     '''
-    Read model training result and spending origin. 
+    Read model training result and spending origin.
     For keeping the flexibility of calling different function, duplicate the spending_origin reading.
             Return:
                     df_parameter (dataframe): model traning result
@@ -52,55 +53,60 @@ def read_parameters():
 
     with open(datafile_path + "pystan_latest_train.p", "rb") as f:
         df_parameter = pickle.load(f)
-   
+
     return df_parameter
 
-            
-def main(argv): 
+
+def main():
 
     spending, basic, newuser, spending_origin = read_data()
     df_parameter = read_parameters()
 
-    if argv == 'get_prediction_from_samples':
-        get_prediction_from_samples(df_parameter, spending, basic, newuser, spending_origin)
+    with open("parameter.p", 'rb') as f:
+        stan = pickle.load(f)
 
-    elif argv == 'plot_distribution':
-        plot_distribution(df_parameter)
+    Km = stan['Km']
+    Kl = stan['Kl']
+    Kb = stan['Kb']
+    L = stan['L']
+    T = stan['T']
 
-    elif argv == 'draw_origin_spending':
-        draw_origin_spending(spending_origin)
+    with open("spending_column.txt", 'r') as f:
+        media_list = f.read().strip().split(",")[0:-1]
 
-    elif argv == 'actual_all_data_saturation':  # draw saturation graph bachsed on the actual spending
-        results, spending_list, current_spending = actual_all_data_saturation(spending_origin, df_parameter)
-        draw_all_data_saturation(results, spending_list, current_spending)
+    # Check prediction effectiveness. Basically checking the R-square
+    get_prediction_from_samples(df_parameter, newuser, Kl)
 
-    elif argv == 'platform_data_saturation':  # draw saturation graph bachsed on the actual spending
-        results, spending_list, current_spending = actual_all_data_saturation(spending_origin, df_parameter)
-        draw_platform_data_saturation(results, spending_list, current_spending)
+    # Plot parameter distribution, within result_graph.py
+    plot_distribution(df_parameter, Km, Kb)
 
-    elif argv == 'actual_data_saturation': # saturation graph for each platform
-        results, spending_list, current_spending = actual_data_saturation(spending_origin, df_parameter)
-        draw_actual_saturation(results, spending_list, current_spending)
+    # Draw Original Spending
+    draw_origin_spending(spending_origin, Km, media_list)
 
-    elif argv == 'draw_seasonality':     # draw seasonality
-        draw_seaonality(df_parameter, basic)
+    # Draw all data saturation
+    results, spending_list, current_spending = actual_all_data_saturation(spending_origin, df_parameter, Km, L)
+    draw_all_data_saturation(results, spending_list, current_spending, media_list, Km)
+    draw_platform_data_saturation(results, spending_list, current_spending, media_list, Km)
 
-    elif 'channel_contribution' in argv:
-        splits = argv.strip().split(" ")
-        total, contribution = calculate_prediction_and_prediction_removed(df_parameter, splits[-1])
-        draw_contribution(total, contribution)
-       
-    elif argv == 'channel_information':
-        draw_channel_information(df_parameter, spending_origin)
-    
-    elif argv == 'decay_effect':
-        draw_decay_effect(df_parameter)
+    results, spending_list, current_spending = actual_data_saturation(spending_origin, df_parameter, Km, L)
+    draw_actual_saturation(results, spending_list, current_spending, media_list, Km)
 
-    else:
-        print("The function you input is not in the function list")
+    draw_seaonality(df_parameter, basic, Kl)
+
+    # Channel contribution
+    total, contribution = calculate_prediction_and_prediction_removed(df_parameter, Km, Kl)
+    draw_contribution(total, contribution, media_list)
+
+    # Channel Information
+    draw_channel_information(df_parameter, spending_origin, Km, Kl, T, media_list)
+
+    # Decay Effect
+    draw_decay_effect(df_parameter, Km, media_list)
+
+    print("Done")
+
 
 if __name__ == '__main__':
-    fun_name = input("Please input the function you want to run: \n")
-    main(fun_name)
+    main()
 
 

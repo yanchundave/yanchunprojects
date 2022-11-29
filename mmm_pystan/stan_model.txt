@@ -1,0 +1,112 @@
+data {
+    int<lower=1> N; //number of observations
+    int M;
+    int<lower=1> Kb; // number of base prediction
+    int<lower=1> Km; //number of media predictions
+    
+    int<lower=6> L; //carryover effect
+
+    real<lower=0> y[M]; // target variables
+
+    row_vector[Kb] x_b[N]; // X matrix defined with N obs and Kb predictors
+    row_vector[Km] x_m[N]; // X matrix definied with N obs and Km predictors
+  
+}
+transformed data {
+    vector[L] coe;
+    
+    for (i in 1:L){
+        coe[i] = L - i + 1;
+        //coe[i] = i;
+    }
+    
+}
+
+parameters {
+    real sigma; //error scale 
+    real<lower=0> ru; //intercept
+    vector[Kb] beta_b; //the coefficients for base variables
+    vector<lower=0>[Km] beta_m; //the coefficients for media variables
+    
+    vector<lower=0, upper=1>[Km] alpha; //the retention rate for each media
+    //vector<lower=0, upper=4>[Km] theta; //the delay factor
+    
+}
+
+transformed parameters {
+
+    row_vector[Km] x_adstock[N]; //transform x for media
+    row_vector[Km] x_hill[N]; // after hill function
+   
+     
+    for(i in 1:N)
+    {
+        for (k in 1:Km)
+        {
+            x_adstock[i][k] = 0;
+            real coe_total = 0;
+
+            if(i <= L)
+            {
+                for (j in 1:i)
+                {
+                    //x_adstock[i][k] = x_adstock[i][k] + x_m[j][k] * alpha[k] ^ (coe[L - i + j ] - 1 - theta[k]) ^2;
+                    //coe_total += alpha[k] ^ (coe[L - i + j ] - 1 - theta[k]) ^2;
+                    x_adstock[i][k] = x_adstock[i][k] + x_m[j][k] * alpha[k] ^ (coe[L - i + j ] - 1);
+                    coe_total += alpha[k] ^ (coe[L - i + j ] - 1);
+                }
+                
+
+            }
+            else
+            {
+                for (j in 1:L)
+                {
+                    //x_adstock[i][k] = x_adstock[i][k] + x_m[i - L + j][k] * alpha[k] ^ (coe[j] - 1 - theta[k])^2;
+                    //coe_total += alpha[k] ^ (coe[j] - 1 - theta[k])^2;
+                    x_adstock[i][k] = x_adstock[i][k] + x_m[i - L + j][k] * alpha[k] ^ (coe[j] - 1) ;
+                    coe_total += alpha[k] ^ (coe[j] - 1) ;
+                }
+
+            }
+            x_adstock[i][k] = x_adstock[i][k] / (coe_total + 0.1);
+            x_hill[i][k] = log(x_adstock[i][k] + 1);    
+            
+        }
+        
+    }
+}
+
+model 
+{
+    sigma ~ normal(0, 1); //errors
+    ru ~ normal(1.75, 1 );
+    beta_b ~ normal(0, 1);
+    beta_m ~ normal(0, 1);
+    //theta ~ normal(1, 1);
+    alpha ~ normal(0.2, 0.5);
+    
+    {
+        vector[M] x_sum;
+        for (n in 1:M)
+        {
+            x_sum[n] = ru + dot_product(x_b[n], beta_b) + dot_product(x_hill[n], beta_m);
+        }
+        
+        y ~ normal(x_sum, sigma);
+    }
+
+}
+
+generated quantities {
+    vector[N] y_fitted;
+    row_vector[N] y_remove[Km];
+
+    for (n in 1:N){
+        y_fitted[n] = normal_rng(ru + dot_product(x_b[n], beta_b) + dot_product(x_hill[n], beta_m), sigma);
+        for (m in 1:Km){
+            y_remove[m][n] = normal_rng(ru + dot_product(x_b[n], beta_b) + dot_product(x_hill[n], beta_m) - x_hill[n][m] * beta_m[m], sigma);
+        }
+    }
+
+}

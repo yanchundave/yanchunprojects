@@ -1,0 +1,60 @@
+Snapchat_Android_alphas=c(0.5, 4),
+Snapchat_Android_gammas=c(0.3,1),
+Snapchat_Android_shapes=c(0.0001,2),
+Snapchat_Android_scales=c(0, 0.1),
+
+bytedanceglobal_int_Android_alphas=c(0.5, 4),
+bytedanceglobal_int_Android_gammas=c(0.3,1),
+bytedanceglobal_int_Android_shapes=c(0.0001,2),
+bytedanceglobal_int_Android_scales=c(0, 0.1),
+
+bytedanceglobal_int_iOS_alphas=c(0.5, 4),
+bytedanceglobal_int_iOS_gammas=c(0.3,1),
+bytedanceglobal_int_iOS_shapes=c(0.0001,2),
+bytedanceglobal_int_iOS_scales=c(0, 0.1),
+
+Snapchat_iOS_alphas=c(0.5, 4),
+Snapchat_iOS_gammas=c(0.3,1),
+Snapchat_iOS_shapes=c(0.0001,2),
+Snapchat_iOS_scales=c(0, 0.1),
+
+Adwords_iOS_alphas=c(0.5, 4),
+Adwords_iOS_gammas=c(0.3,1),
+Adwords_iOS_shapes=c(0.0001,2),
+Adwords_iOS_scales=c(0, 0.1),
+
+Apple_Search_Ads_iOS_alphas=c(0.5, 4),
+Apple_Search_Ads_iOS_gammas=c(0.3,1),
+Apple_Search_Ads_iOS_shapes=c(0.0001,2),
+Apple_Search_Ads_iOS_scales=c(0, 0.1),
+
+Tatari_TV_alphas=c(0.5, 4),
+Tatari_TV_gammas=c(0.3,1),
+Tatari_TV_shapes=c(0.0001,2),
+Tatari_TV_scales=c(0, 0.1),
+
+Facebook_Android_alphas=c(0.5, 4),
+Facebook_Android_gammas=c(0.3,1),
+Facebook_Android_shapes=c(0.0001,2),
+Facebook_Android_scales=c(0, 0.1),
+
+Facebook_iOS_alphas=c(0.5, 4),
+Facebook_iOS_gammas=c(0.3,1),
+Facebook_iOS_shapes=c(0.0001,2),
+Facebook_iOS_scales=c(0, 0.1),
+
+Adwords_Android_alphas=c(0.5, 4),
+Adwords_Android_gammas=c(0.3,1),
+Adwords_Android_shapes=c(0.0001,2),
+Adwords_Android_scales=c(0, 0.1),
+
+minor_channels_alphas=c(0.5, 4),
+minor_channels_gammas=c(0.3,1),
+minor_channels_shapes=c(0.0001,2),
+minor_channels_scales=c(0, 0.1),
+
+new_channels_alphas=c(0.5, 4),
+new_channels_gammas=c(0.3,1),
+new_channels_shapes=c(0.0001,2),
+new_channels_scales=c(0, 0.1),
+

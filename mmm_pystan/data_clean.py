@@ -1,18 +1,56 @@
-"""This is data clean and scale code snippet. It is before training part.
+import numpy as np
+import pandas as pd
+from datetime import datetime, timedelta
+from sklearn.preprocessing import MinMaxScaler
+import pickle
+import math
+from global_variable import *
+
+
+"""
+Step 2:
+
+This is data clean and scale code snippet. It is before training part.
 
 The input data are daily spending data for each channel and new daily PV users.
 
 Remember to update global_variables and also response_file
 """
+minor_channels = [
+    'bytedanceglobal_int_unknown',
+    'Taboola_iOS',
+    'Adwords_unknown',
+    'Reddit_iOS',
+    'Taboola_Android',
+    'Reddit_Android',
+    'Applovin_Android',
+    'Facebook_unknown',
+    'Snapchat_unknown',
+    ]
 
+new_channels = [
+    'YouTube_unknown',
+    'Videoamp_unknown',
+    'Streaming_unknown',
+    'National_Radio_unknown',
+    'Podcast_unknown',
+    'Local_Radio_unknown'
+    ]
 
-import numpy as np 
-import pandas as pd 
-from datetime import datetime, timedelta
-from sklearn.preprocessing import MinMaxScaler
-import pickle 
-import math
-from global_variable import *
+removed_channels = ['BRANDING_unknown']
+
+major_channels = [
+    'Snapchat_Android',
+    'bytedanceglobal_int_Android',
+    'bytedanceglobal_int_iOS',
+    'Snapchat_iOS',
+    'Adwords_iOS',
+    'Apple_Search_Ads_iOS',
+    'Tatari_TV',
+    'Facebook_Android',
+    'Facebook_iOS',
+    'Adwords_Android'
+    ]
 
 
 def stack_columns(df, column_list, column_name):
@@ -21,7 +59,8 @@ def stack_columns(df, column_list, column_name):
         df[column_name] = df[column_name] + df[item]
     return df
 
-def clean_spending_update(df):
+
+def channel_combine(df):
     '''
     Return a cleaned spending dataframe.
 
@@ -29,18 +68,15 @@ def clean_spending_update(df):
                    df (dataframe): dataframe of daily spending. columns are "DATE, SPEND, NETWORK"
 
            Returns:
-                   dfupdate (dataframe): dataframe of daily spennding. 
+                   dfupdate (dataframe): dataframe of daily spennding.
                    columns are "Date, channels (six), spending, day, week, month, quarter
     '''
 
-    column_name = [x for x in df.columns if ('BRANDING' not in x) and ('Taboola' not in x)]
-    unknown_column = [x for x in column_name if ('unknown' in x) and ('Videoamp' not in x)]
-    tv_column = [x for x in column_name if ('Tatari' in x) or ('Videoamp' in x)]
-    df = stack_columns(df, unknown_column, 'unknown')
-    df = stack_columns(df, tv_column, 'TV')
-
-    column_name_update = [x for x in column_name if (x not in unknown_column) and (x not in tv_column) and ('Unnamed' not in x)]
-    column_name_update += ['unknown', 'TV']
+    df = stack_columns(df, minor_channels, 'minor_channels')
+    df = stack_columns(df, new_channels, 'new_channels')
+    df = df.drop(removed_channels, axis=1)
+    df = df.drop(new_channels, axis=1)
+    df = df.drop(minor_channels, axis=1)
 
     df['date_update'] = pd.to_datetime(df['date'], format='%Y-%m-%d %H:%M:%S')
     df['datenumber'] = df['date_update'].dt.strftime('%Y-%m-%d')
@@ -49,13 +85,21 @@ def clean_spending_update(df):
     df['month'] = df['date_update'].dt.month
     df['quarter'] = df['date_update'].dt.quarter
 
-    column_name_update += ['datenumber', 'day', 'week', 'month', 'quarter']
+    column_name_update = major_channels + ['date', 'datenumber', 'day', 'week', 'month', 'quarter', 'minor_channels', 'new_channels']
     dfupdate = df.loc[:, column_name_update]
-    return dfupdate
+    spending_channels = major_channels + ['minor_channels', 'new_channels']
+
+    # Remove minor_channels
+    #dfupdate_1 = dfupdate.drop(['minor_channels'], axis=1)
+    #spending_channels.remove("minor_channels")
+
+    return dfupdate, spending_channels
+
 
 def normalize_y(pv):
     return np.log(pv / y_constant + 1)
-   
+
+
 def combine_x_y(spending_pv, df_pv):
     '''
     Returns dataframe combine spending with pv after MinMaxScaler.
@@ -70,9 +114,10 @@ def combine_x_y(spending_pv, df_pv):
                     y (array): new users
                     spending_tmp (np.array): spending without scaling
     '''
+
     scaler = MinMaxScaler()
-    df_spending = clean_spending_update(spending_pv)
-    spending_column = [x for x in df_spending.columns if ('Android' in x) or ('iOS' in x)] + ['unknown', 'TV']
+    df_spending, spending_column = channel_combine(spending_pv)
+
     df_pv['y'] = normalize_y(df_pv['PV'])    # scale new users by actual new user divided by 1000 and get its log.
     df_combine = pd.merge(df_spending, df_pv, on=['date'], how='inner')
     df_combine = df_combine.sort_values(by=['datenumber'], ascending=True)
@@ -87,7 +132,7 @@ def combine_x_y(spending_pv, df_pv):
         df_combine[item + '_cos'] = np.cos(df_combine[item] * 2 * math.pi / seasonality_constant[i])
         basic_columns.append(item + '_sin')
         basic_columns.append(item + '_cos')
-   
+    # Remove day_sin and day_cos
     basic_columns_update = ['trend_update', 'week_sin', 'week_cos', 'month_sin', 'month_cos', 'quarter_sin', 'quarter_cos']
 
     spending_tmp = df_combine.fillna(0).loc[:, spending_column].to_numpy()
@@ -96,7 +141,8 @@ def combine_x_y(spending_pv, df_pv):
     scaler = MinMaxScaler()
     spending_scaler = scaler.fit_transform(spending_tmp)
     basic_scaler = df_combine.loc[:, basic_columns_update].to_numpy()
-    return spending_scaler, basic_scaler, np.array(df_pv['y']), spending_tmp
+
+    return spending_scaler, basic_scaler, np.array(df_pv['y']), spending_tmp, spending_column
 
 
 def pickle_dump(obj, datapath):
@@ -108,25 +154,33 @@ def obtain_limits(y):
     y_value = y.copy()
     return np.quantile(y_value, 0.025), np.quantile(y_value, 0.975)
 
+
 def data_input():
     '''
     Input the spending and pv from csv.
     Clip the outliers and limit the y within 1.5 and 2.4 after investigation.
     Dump the scaled spending, pv, origin_spending to pickle files for model training and analysis.
     '''
-    
-    pv_daily = response_file
-    spending_daily = independent_file
+
+    pv_daily = "platform_user_advance.csv" if FLAG == 1 else "total_revenue.csv"
+    spending_daily = "channel_spending_raw.csv"
     df_pv = pd.read_csv(datafile_path + pv_daily)
     spending_pv = pd.read_csv(datafile_path + spending_daily)
-    spending, basic, y, spending_origin = combine_x_y(spending_pv, df_pv)
+
+    spending, basic, y, spending_origin, spending_column = combine_x_y(spending_pv, df_pv)
     lowerlimit, upper_limit = obtain_limits(y)
     y = np.clip(y, lowerlimit, upper_limit)
+
     pickle_dump(spending, datafile_path + "spending.p")
     pickle_dump(basic, datafile_path + "basic.p")
     pickle_dump(y, datafile_path + "newuser.p")
     pickle_dump(spending_origin, datafile_path + "spending_origin.p")
+    # save spending column for training data
+    with open("spending_column.txt", 'w') as f:
+        for item in spending_column:
+            f.write(item + ",")
     print("Done")
+
 
 def main():
     data_input()
@@ -134,4 +188,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    
