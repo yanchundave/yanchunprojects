@@ -167,24 +167,28 @@ for (i in 1:length(ExportedModel$summary$rn)){
 }
 
 #### Marginal Response of different channels
+adratio = c(1.7663935027440203, 1.7567139088136428, 3.2770888140943986, 2.273069455846515, 
+            1.6141784947032813, 2.804163389631244, 5.1435913281193, 
+            0.6429922565473447, 8.622706162131125, 5.072511598243497, 3.8236074567111165, 0.8297422987060825)
 margin_total <- c()
-for(k in 1:10){
+for(k in 1:2){
   marginal <- c()
   for (i in 1:length(ExportedModel$summary$rn)){
     
     t1 <- robyn_response(
       robyn_object = "/Users/yanchunyang/Documents/datafiles/Rfile/advance/Robyn_update.RDS",
       media_metric = ExportedModel$summary$rn[i],
-      metric_value = ExportedModel$summary$mean_spend[i]
+      metric_value = ExportedModel$summary$mean_spend[i] * adratio[i]
     )
     
     t2 <- robyn_response(
       robyn_object = "/Users/yanchunyang/Documents/datafiles/Rfile/advance/Robyn_update.RDS",
       media_metric = ExportedModel$summary$rn[i] ,
-      metric_value = ExportedModel$summary$mean_spend[i] * (1 + 0.05 * k )
+      metric_value = ExportedModel$summary$mean_spend[i]* adratio[i] + 1000*k
     )
     
-    margin<- (t2$response - t1$response) /(ExportedModel$summary$mean_spend[i] * 0.05 * k)
+    #margin<- (t2$response - t1$response) /(ExportedModel$summary$mean_spend[i] * 0.005 * k)
+    margin<- (t2$response - t1$response) /(1000*k)
     marginal[i] <- margin
   }
   if(k == 1) {
@@ -195,13 +199,92 @@ for(k in 1:10){
   }
 }
 margin_df <-data.frame(margin_total)
-write.csv(margin_df, file="/Users/yanchunyang/Documents/datafiles/Rfile/advance/margin_total.csv")
+write.csv(margin_df, file="/Users/yanchunyang/Documents/datafiles/Rfile/advance/margin_total_check.csv")
+options(scipen = 100)
+print(ExportedModel$summary$rn)
+print(marginal)
+
+#######Robyn_allocator
+
+optimialCollect <- robyn_allocator(
+  robyn_object = "/Users/yanchunyang/Documents/datafiles/Rfile/advance/Robyn_update.RDS",
+  select_build = 0,
+  scenario = "max_response_expected_spend",
+  channel_constr_low = c(0.7, 0.7, 0.7,0.5, 0.5, 0.5,0.5, 0.7, 0.5,0.5, 0.5, 0.5),
+  channel_constr_up = c(5, 5, 5, 1, 1, 1.5,2, 5, 2,2, 2, 1),
+  expected_spend = 17000000,
+  expected_spend_days = 150
+)
+
+
+optimialCollectHistorical <- robyn_allocator(
+  robyn_object = "/Users/yanchunyang/Documents/datafiles/Rfile/advance/Robyn_update.RDS",
+  select_build = 0,
+  scenario = "max_historical_response",
+  channel_constr_low = c(0.7, 0.7, 0.7,0.7, 0.7, 0.7,0.7, 0.7, 0.7,0.7, 0.7, 0.7),
+  channel_constr_up = c(1.5, 1.5, 1.5, 1.5, 1.5, 1.5,1.5, 1.5, 1.5,1.5, 1.5, 1.5)
+)
+
+################ Explore the optimal range
+
+optimal_channels = c('Tatari_TV','Facebook_iOS','Adwords_Android','new_channels')
+
+m_channel <- c()
+m_spending <- c()
+
+for (i in 1:length(ExportedModel$summary$rn)){
+  if(is.element(ExportedModel$summary$rn[i], optimal_channels)){
+    m_channel <- append(m_channel, ExportedModel$summary$rn[i])
+    m_spending <- append(m_spending,ExportedModel$summary$mean_spend[i] )
+  }
+}
+
+
+margin_total <- c()
+for(k in 1:40){
+  marginal <- c()
+  for (i in 1:length(m_channel)){
+    
+    t1 <- robyn_response(
+      robyn_object = "/Users/yanchunyang/Documents/datafiles/Rfile/advance/Robyn_update.RDS",
+      media_metric = m_channel[i],
+      metric_value = m_spending[i]
+    )
+    
+    t2 <- robyn_response(
+      robyn_object = "/Users/yanchunyang/Documents/datafiles/Rfile/advance/Robyn_update.RDS",
+      media_metric = m_channel[i] ,
+      metric_value = m_spending[i] * (1 + 0.05 * k )
+    )
+    
+    margin<- (t2$response - t1$response) /(m_spending[i] * 0.05 * k)
+    marginal[i] <- margin
+  }
+  if(k == 1) {
+    margin_total <- marginal
+  }
+  else{
+    margin_total <-rbind(margin_total, marginal)
+  }
+}
+margin_df <-data.frame(margin_total)
+write.csv(margin_df, file="/Users/yanchunyang/Documents/datafiles/Rfile/advance/margin_total_optimal.csv")
 options(scipen = 100)
 print(ExportedModel$summary$rn)
 print(marginal)
 
 
+t3 <- robyn_response(
+  robyn_object = "/Users/yanchunyang/Documents/datafiles/Rfile/advance/Robyn_update.RDS",
+  media_metric = 'bytedanceglobal_int_iOS',
+  metric_value = 2380
+)
 
+
+paid_media_spends = c('Snapchat_Android', 'bytedanceglobal_int_Android',
+                      'bytedanceglobal_int_iOS', 'Snapchat_iOS', 'Adwords_iOS',
+                      'Apple_Search_Ads_iOS', 'Tatari_TV', 'Facebook_Android', 'Facebook_iOS',
+                      'Adwords_Android',  'minor_channels', 'new_channels')
 ###########select best model to output
 #select_model <- "1_125_6" # select one from above
 #ExportedModel <- robyn_save(
