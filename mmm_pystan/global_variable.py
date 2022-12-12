@@ -17,7 +17,7 @@ date_diff = (datetime.strptime(END_DATE, '%Y-%m-%d') - datetime.strptime(ORIGIN_
 #media_list = ['Adwords_Android', 'Adwords_iOS', 'Apple_Search_Ads_iOS', 'Facebook_Android', 'Facebook_iOS',
 #'Snapchat_Android', 'Snapchat_iOS', 'bytedanceglobal_int_Android', 'bytedanceglobal_int_iOS', 'unknown', 'TV']
 
-
+LTV_VALUE = 115
 
 
 sample_size = 1000

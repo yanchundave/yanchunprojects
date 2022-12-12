@@ -127,6 +127,7 @@ def generate_date_for_robyn():
     dependent = pd.read_csv(datafile_path + user_file)
 
     df_user = dependent.loc[:, ['date', 'PV']]
+    df_user['PV'] = df_user['PV'] * LTV_VALUE
     df_spending = spending.loc[:, ['date', 'channel', 'platform', 'spending']]
 
     df_spending['channel_spending'] = df_spending['channel'].astype(str) + "_" + df_spending['platform'].astype(str)
