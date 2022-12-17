@@ -2,6 +2,9 @@ import pandas as pd
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 import numpy as np
+from collections import defaultdict
+import math
+import hillfit
 
 analysis_path = "/Users/yanchunyang/Documents/datafiles/Rfile/advance/"
 
@@ -34,6 +37,52 @@ historic_time_span = 295
 # We have to estimate the ROAS by decompse value
 # need figure out a better way to estimate ROAS through smoothing technique, but temporarily solve by the below function
 
+def moving_average(a, n):
+    '''
+    Return the moving average of a list based on the moving number.
+
+            Parameters:
+                    a (list): the list for moving average
+                    n (integer): the number for moving avearge
+    '''
+
+    ret = np.cumsum(a, dtype=float)
+    ret[n:] = ret[n:] - ret[:-n]
+    return ret[n-1:] / n
+
+def get_margin(tmp_channel, mean_spending, k):
+    p = simuation_function(tmp_channel)
+    mean_spending_rate1 = p(mean_spending)
+    mean_spending_rate2 = p(mean_spending + k)
+    r2 = (mean_spending + k) * mean_spending_rate2
+    r1 = mean_spending * mean_spending_rate1
+    #print(mean_spending_rate1)
+    #print(mean_spending_rate2)
+    return (r2 - r1) / k
+
+
+def get_margin_update(tmp_channel, mean_spending, k):
+
+    mean_spending_rate1 = calculate_margin(tmp_channel, mean_spending)
+    mean_spending_rate2 = calculate_margin(tmp_channel, mean_spending + k)
+    r2 = (mean_spending + k) * mean_spending_rate2
+    r1 = mean_spending * mean_spending_rate1
+    print(mean_spending_rate1)
+    print(mean_spending_rate2)
+    print(r2)
+    print(r1)
+    #print(mean_spending_rate1)
+    #print(mean_spending_rate2)
+    return (r2 - r1) / k
+
+def sigmoid(x, L ,x0, k, b):
+    y = L / (1 + np.exp(-k*(x-x0))) + b
+    return (y)
+
+def hillfunc(x, a, b, c, d):
+    y = a + (b-a)/(1 + math.power(c/x, d))
+    return y
+
 def calculate_margin(tmp_channel, mean_spending):
     # this spending is adstorkedMedia
     # spending = transform_file.loc[(transform_file['type']== 'adstockedMedia')&(transform_file['solID'] == solID),:]
@@ -50,7 +99,7 @@ def calculate_margin(tmp_channel, mean_spending):
     dcom_supdate['rate'] = dcom_supdate[tmp_channel] / (dcom_supdate[tmp_channel +'spending'] + 0.01)
     # Set the rate to zero if spending is zero
     dcom_supdate['rate'] = dcom_supdate.apply(lambda x: x['rate'] if x[tmp_channel+'spending'] > 0 else 0, axis=1)
-    dcom_supdate = dcom_supdate.loc[dcom_supdate['rate']<=10,:]
+    dcom_supdate = dcom_supdate.loc[dcom_supdate['rate']<=4,:]
 
     # Filter the setting spending left and right within 10%
     spendingchannelname = tmp_channel + 'spending'
@@ -120,13 +169,13 @@ def get_point_update(minspend, maxspend, p):
     cumy = 0
     x = [0]
     y = [0]
-    dis = int((maxspend - minspend) / 100)
+    dis = int((maxspend - minspend) / 200)
     for i in range(0, 100):
         cumx += dis
         rate = p(cumx)
         if rate < 0:
             print(cumx)
-        cumy += rate * dis
+        cumy = rate * cumx
         if cumy > 0:
             x.append(cumx)
             y.append(cumy)
@@ -135,9 +184,28 @@ def get_point_update(minspend, maxspend, p):
 def get_current_point(x_1, x, y):
     for i in range(0, len(x)):
         if x[i] > x_1:
-            return x[i-1], y[i-1]
-    return x_1, 0
+            return x_1, np.interp(x_1, [x[i-1], x[i]], [y[i-1], y[i]]), x[i], y[i]
+    return x_1, 0, 1, 0
 
+def draw_spending_response(tmp_channel):
+    real_spending = df.loc[:, ['date', tmp_channel]]
+    real_spending.columns = ['ds',tmp_channel + 'spending']
+    decom = decompose.loc[decompose['solID']== solID, ['ds', tmp_channel]]
+    spending_response = pd.merge(real_spending, decom, on=['ds'], how='inner')
+    #spending_response.loc[len(spending_response.index)] = ['2021-12-31', 0.1, 0]
+    spending_response = spending_response.loc[spending_response[tmp_channel+'spending'] > 0,:]
+    spending_response['rate'] = spending_response[tmp_channel] / (spending_response[tmp_channel + 'spending'])
+    spending_response = spending_response.loc[spending_response['rate'] <4, :]
+    spending_response = spending_response.sort_values(by=[tmp_channel + 'spending'])
+    p = func2(spending_response[tmp_channel+'spending'], spending_response[tmp_channel], 2)
+    spending_response['yhat'] = p(spending_response[tmp_channel + 'spending'])
+    hf = hillfit.HillFit(spending_response[tmp_channel + 'spending'], spending_response['yhat'])
+    hf.fitting(x_label='x', y_label='y', title='Fitted Hill equation', sigfigs=6, log_x=False, print_r_sqr=True,
+           generate_figure=False, view_figure=True, export_directory=None, export_name=None)
+    x_0 = metrics.loc[metrics['rn'] == tmp_channel, 'mean_spend'].values[0]
+    x_1, y_1, x_2, y_2 = get_current_point(x_0, hf.x_fit, hf.y_fit)
+    #plt.plot(spending_response[tmp_channel + 'spending'], spending_response[tmp_channel])
+    return hf.x_fit, hf.y_fit, x_1, y_1, x_2, y_2
 
 def draw_roas_rate(tmp_channel):
     real_spending = df.loc[:, ['date', tmp_channel]]
@@ -177,8 +245,8 @@ def draw_roas_rate(tmp_channel):
     #plt.close()
     #return spending_needed
     x_0 = metrics.loc[metrics['rn'] == tmp_channel, 'mean_spend'].values[0]
-    x_1, y_1 = get_current_point(x_0, x, y)
-    return x, y, x_1, y_1
+    x_1, y_1, x_2, y_2 = get_current_point(x_0, x, y)
+    return x, y, x_1, y_1, x_2, y_2
 
 def func1(x, a, b, c, d):
     return a*x**3+ b*x**2 + c*x + d
@@ -190,26 +258,21 @@ def func2(x, y, degree):
 
 def draw_saturtion_customized(channel_list):
     title = ""
-    xt =[]
-    yt =[]
-    xs = []
-    ys = []
+    margin_dic = {}
     for item in channel_list:
         title += item + ", "
-        x, y, x_1, y_1 = draw_roas_rate(item)
-        xt.append(x)
-        yt.append(y)
-        xs.append((x_1, y_1))
-        plt.plot(xt[-1], yt[-1],label=item, linewidth=1)
-        #plt.plot(xy[item+'_x'], yfit1, label=item, linewidth=1, color='green')
-
+        x, y, x_1, y_1, x_2, y_2 = draw_spending_response(item)
+        margin = (y_2 - y_1)/(x_2 - x_1 + 0.01)
+        plt.plot(x, y,label=item, linewidth=1)
         plt.scatter(x_1, y_1)
+        margin_dic[item] = margin
     plt.legend()
     plt.title("Saturation Curves of " + title)
     plt.gcf().set_size_inches(10, 5)
     plt.style.use('fast')
     plt.savefig(analysis_path + title.strip()+ ".png")
     plt.close()
+    print(margin_dic)
 
 def draw_saturation(channel_list):
     spending = transform_file.loc[(transform_file['type']== 'adstockedMedia')&(transform_file['solID'] == solID),:]
@@ -238,9 +301,39 @@ def draw_saturation(channel_list):
     plt.style.use('fast')
     plt.savefig(analysis_path + title.strip()+ ".png")
 
+
+def simuation_function(tmp_channel):
+    real_spending = df.loc[:, ['date', tmp_channel]]
+    real_spending.columns = ['ds',tmp_channel + 'spending']
+    decom = decompose.loc[decompose['solID']== solID, ['ds', tmp_channel]]
+    spending_response = pd.merge(real_spending, decom, on=['ds'], how='inner')
+    spending_response = spending_response.loc[spending_response[tmp_channel+'spending'] > 0,:]
+    spending_response['rate'] = spending_response[tmp_channel] / (spending_response[tmp_channel + 'spending'])
+    spending_response = spending_response.loc[spending_response['rate'] <4, :]
+    # get break even point
+    filtered_spending = spending_response.loc[(spending_response['rate'] >=0.9) & (spending_response['rate'] <= 1.1), :]
+
+    spending_needed = filtered_spending[tmp_channel+'spending'].mean()
+    #print(spending_needed)
+    spending_response = spending_response.sort_values(by=[tmp_channel + 'spending'])
+    """
+    params, _ = curve_fit(func1, spending_response[tmp_channel+'spending'], spending_response['rate'])
+    a, b, c, d= params[0], params[1], params[2], params[3]
+    maxspend = spending_response[tmp_channel+'spending'].max()
+    minspend = spending_response[tmp_channel+'spending'].min()
+    x, y = get_point(minspend, maxspend, a, b, c, d)
+    yfit1 = func1(spending_response[tmp_channel+'spending'], a, b, c, d)
+    #ypredict = spending_response[tmp_channel+'spending'] * yfit1
+    """
+    p = func2(spending_response[tmp_channel+'spending'], spending_response['rate'], 7)
+    return p
+
 def main():
     optimal_spending = pd.read_csv(analysis_path + "5_200_2_reallocated_best_1.csv")
     hist_spending = hist_spending = pd.read_csv(analysis_path + "5_200_2_reallocated_hist.csv")
+
+    mean_spend = metrics['mean_spend']
+    print(mean_spend)
 
     #compare_optimal_distribution(optimal_spending)
     #compare_hist_distribution(hist_spending)
@@ -253,20 +346,46 @@ def main():
     """
     #channel_list = ['Apple_Search_Ads_iOS', 'Adwords_iOS', 'Facebook_Android']
     #channel_list = ['Snapchat_iOS', 'bytedanceglobal_int_Android','bytedanceglobal_int_iOS']
-    #channel_list = [ 'Tatari_TV', 'Facebook_iOS', 'Adwords_Android',]
-    channel_list = [ 'new_channels']
+    channel_list = [ 'Tatari_TV', 'Facebook_iOS', 'Adwords_Android',]
+    #channel_list = [ 'new_channels']
+    #channel_list = [ 'Tatari_TV', 'new_channels']
     """
-    for item in colname:
+    for item in channel_list:
         print(item)
         draw_saturtion_customized([item])
     """
-    draw_saturtion_customized(colname)
+    #draw_saturtion_customized(colname)
+
+    """
+    item = 'Tatari_TV'
+    mean_spending = metrics.loc[metrics['rn']==item, ['mean_spend']].values[0][0]
+    get_margin_update('Tatari_TV', mean_spending, 1000)
+    """
 
     #draw_roas_rate('Apple_Search_Ads_iOS')
     #draw_roas_rate('Adwords_iOS')
     #for item in colname:
     #    draw_roas_rate(item)
 
+    small_channels = ['Snapchat_iOS', 'bytedanceglobal_int_Android','bytedanceglobal_int_iOS', 'Snapchat_Android']
+    big_channels = ['Apple_Search_Ads_iOS', 'Adwords_iOS', 'Facebook_Android', 'Facebook_iOS', 'Tatari_TV', 'new_channels', 'Adwords_Android']
+    #draw_saturtion_customized(small_channels)
+    #draw_saturtion_customized(big_channels)
+    draw_saturtion_customized(channel_list)
+    """
+    margins = defaultdict(list)
+    for item in big_channels:
+        mean_spending = metrics.loc[metrics['rn']==item, ['mean_spend']].values[0][0]
+        for k in range(1, 11):
+            tmp = 1000 + (k - 1) * 1000
+            margins[item].append(get_margin_update(item, mean_spending, tmp))
+    margins_df = pd.DataFrame.from_dict(margins)
+    margins_df.to_csv(analysis_path + "big_margins_df_1.csv")
+    """
+    """
+    for item in colname:
+        draw_spending_response(item)
+    """
 
 if __name__ == '__main__':
     main()
