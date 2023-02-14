@@ -1,0 +1,9 @@
+******************
+This is the step for new users within one quarter
+******************
+
+Step1: generate the yellow features for training dataset.
+Step2: generate the green features for training dataset.
+Step3: Combine both features
+Step4: training
+Step5: Forecast
