@@ -29,7 +29,8 @@ CHIME AS
         'CHIME' AS FUNDING_NAME,
         0 AS R_AMOUNT,
         BALANCE_VALUE AS T_AMOUNT
-    FROM DBT.DEV_YANCHUN_PUBLIC.multi_draw_chime_dedup
+    FROM DBT.DEV_YANCHUN_PUBLIC.multi_draw_chime_dedup_update
+
 ),
 NONCHIME AS
 (

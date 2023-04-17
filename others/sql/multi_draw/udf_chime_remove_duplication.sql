@@ -43,3 +43,16 @@ $$
          ELSE NULL
     END
 $$;
+
+CREATE OR REPLACE FUNCTION DBT.DEV_YANCHUN_PUBLIC.UDF_NONCHIME_COMPETITOR(description STRING) RETURNS STRING AS
+$$
+    -- Top competitior: Albert, Brigit, Empower, Earnin --
+    -- exclued chime since it is unique --
+    CASE WHEN LOWER(description) LIKE 'albert instant%' OR LOWER(description) LIKE 'albert savings%' THEN 'Albert'
+         WHEN LOWER(description) LIKE '%brigit%' THEN 'Brigit'
+         WHEN LOWER(description) LIKE '%empower%' THEN 'Empower'
+         WHEN LOWER(description) LIKE '%earnin%' AND LOWER(description) NOT LIKE '%learnin%' THEN 'EarnIn'
+         WHEN LOWER(description) LIKE '%money%lion%' THEN 'Money Lion'
+         ELSE NULL
+    END
+$$;
