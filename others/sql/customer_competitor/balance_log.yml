@@ -1,0 +1,46 @@
+version: 2
+
+sources:
+- name: bank_data_service
+  database: dave
+  schema: bank_data_service
+  tables:
+  - name: balance_log
+    description: |
+      Balance logs - Pub/Sub DataCue pipeine, topic: `datacue-balance-log`
+      Mirrors the Bigtable table: `project_id:dave-173321.instance_id:dave-bigtable.table_id:balance_log`
+      Resources:
+      - [FDI/BDS producer](https://github.com/dave-inc/heath/tree/master)
+      - [DataCue consumer](https://github.com/dave-inc/laser-beam/tree/main/dataflow/pipeline/datacue)
+      - [Balance log bookkeeping](https://demoforthedaves.atlassian.net/wiki/spaces/DE/pages/2090303838/Balance+Log+Bookkeeping)
+      For the meaning of protected columns (prepended with "_"), check out the table
+      [here](https://github.com/dave-inc/laser-beam/tree/main/dataflow/pipeline/datacue/snowpipe#datacue-snowpipe)
+    columns:
+    - name: row_id
+      description: Auto incrementing key for warehouse bookkeeping
+    - name: message_id
+      description: Pub/Sub Message Id
+    - name: bank_account_id
+      description: Bank Account Id
+    - name: user_id
+      description: Dave User Id
+    - name: bank_connection_id
+      description: Bank Connection Id
+    - name: curr
+      description: Current balance
+    - name: avail
+      description: Available balance
+    - name: caller
+      description: Caller - origination for balance log inquiry
+    - name: timestamp
+      description: Timestamp associated with the balance
+    - name: created
+      description: Timestamp associated with the Bigtable cell version
+    - name: rowkey
+      description: Bigtable rowkey
+    - name: _filename
+    - name: _last_modified
+    - name: _window_start
+    - name: _window_end
+    - name: _shard_num
+    - name: _version_ts

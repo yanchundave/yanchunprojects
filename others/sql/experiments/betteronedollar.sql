@@ -1,0 +1,24 @@
+WITH USERSET AS
+(
+    SELECT
+        USER_ID,
+        DATE(PV_TS) AS STARTDATE
+    FROM ANALYTIC_DB.DBT_marts.new_user_attribution
+    WHERE STARTDATE >=  DATE('2023-03-01') and STARTDATE <= DATE('2023-03-14')
+),
+ADVANCE AS
+(
+    SELECT
+        USERSET.USER_ID AS USER_ID,
+        DISBURSEMENT_DS_PST AS FUNDING_DATE,
+        advance_id,
+        MAX_APPROVED_AMOUNT AS R_AMOUNT,
+        TAKEN_AMOUNT AS T_AMOUNT,
+        dateadd(day,9, disbursement_ds_pst) as next_funding_date
+    from USERSET
+    LEFT JOIN ANALYTIC_DB.DBT_MARTS.disbursements disburse
+    ON disburse.USER_ID = USERSET.USER_ID
+    WHERE DATEDIFF(DAY, USERSET.STARTDATE, DISBURSE.DISBURSEMENT_DS_PST) <= 30
+
+)
+SELECT COUNT(DISTINCT USER_ID), COUNT(FUNDING_DATE) FROM ADVANCE

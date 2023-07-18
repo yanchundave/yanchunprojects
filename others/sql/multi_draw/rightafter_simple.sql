@@ -151,3 +151,12 @@ from nonchime
 select count(distinct user_id) as userscount, sum(competitor_amount) as competitor_amount, sum(t_amount) as dave_amount, sum(competitor_amount)/count(distinct user_id) as competitor_avg, sum(t_amount)/count(distinct user_id) as dave_avg
   from DBT.DEV_YANCHUN_PUBLIC.multi_draw_simple
   where r_amount = t_amount and competitor_count > 0
+
+--different percentile
+select
+  user_id,
+  sum(r_amount) as request_amount,
+  sum(t_amount) as taken_amount,
+  sum(chime_amount) + sum(nonchime_amount) as competitor_amount
+from DBT.DEV_YANCHUN_PUBLIC.multi_draw_rightafter_update
+group by user_id
