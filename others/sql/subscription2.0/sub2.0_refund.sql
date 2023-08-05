@@ -1,16 +1,33 @@
-with subscription_payment AS (
-
-	SELECT * FROM APPLICATION_DB.TRANSACTIONS_DAVE.SUBSCRIPTION_PAYMENT
-       WHERE DELETED IS NULL AND _FIVETRAN_DELETED = 'FALSE'
-
+with sub as
+(
+    select
+        sub.id ,
+        sub.user_id
+    from DAVE.subscription.subscription sub
+    inner join DAVE.subscription.tier tier ON sub.tier_id = tier.id AND tier.code = 'one_dollar'
+    where
+        started >= date('2023-06-20') and
+        started <= date('2023-07-10') and
+        sub._DELETED = 'FALSE'
 ),
 
-subscription_charge AS (
-
-	SELECT * FROM DAVE.SUBSCRIPTION.SUBSCRIPTION_CHARGE
-       WHERE _DELETED = 'FALSE'
-
+sc as
+(
+    select * from DAVE.SUBSCRIPTION.SUBSCRIPTION_CHARGE where _DELETED='FALSE'
 ),
+scupdate as
+(
+    select
+        sub.user_id,
+        sub.id as subscription_id,
+        sc.id as subscription_charge_id,
+        CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', sc.term_started) AS term_started_pt,
+        sc.subscription_charge_status_id
+    from sub
+    join sc on sub.id = sc.subscription_id
+    where term_started_pt >= Date('2023-06-20') and term_started_pt <= Date('2023-07-10')
+),
+
 
 subscription_charge_status AS (
 
@@ -76,7 +93,7 @@ SELECT
        sc.id as subscription_payment_id,
        sc.reference_id,
        coalesce(sc.UNIT_COST,0)/100 as subsc_fee_collected
-FROM subscription_charge sc
+FROM  sc
 LEFT JOIN subscription_charge_status  ss
 ON sc.subscription_charge_status_id = ss.id
 LEFT JOIN subs2_latest_charge_attempt lca
@@ -162,3 +179,5 @@ from generic_refund)
 
 select *
 from final
+join scupdate
+on final.user_id = scupdate.user_id and final.subscription_payment_id = scupdate.subscription_charge_id
