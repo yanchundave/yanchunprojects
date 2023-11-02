@@ -525,3 +525,61 @@ payment_method
 from sub_charge_new
 qualify
     row_number() over (partition by billing_cycle, user_id order by term_started ) > 1
+
+
+
+----Daiyaan required doc
+
+create or replace table sandbox.dev_yyang.user_charged_incorrect as
+with tmp as (
+  select user_id, payment_pt_dt
+  from sandbox.dev_yyang.legacy_refund
+  union all
+  select user_id, payment_pt_date as payment_pt_dt
+  from sandbox.dev_yyang.sub2_refund
+),
+tmp1 as (
+  select
+    user_id,
+    payment_pt_dt,
+    row_number() over (partition by user_id order by payment_pt_dt) as rownumber
+  from tmp
+),
+numberone as
+(
+    select user_id, payment_pt_dt as first_dt
+    from tmp1
+    where rownumber = 1
+
+),
+second as
+(
+    select user_id, payment_pt_dt as second_dt
+    from tmp1
+    where rownumber = 2
+
+),
+third as
+(
+    select user_id, payment_pt_dt as third_dt
+    from tmp1
+    where rownumber = 3
+
+),
+fourth as
+(
+    select user_id, payment_pt_dt as fourth_dt
+    from tmp1
+    where rownumber = 4
+
+)
+select
+  a.user_id,
+  a.first_dt,
+  b.second_dt,
+  c.third_dt,
+  d.fourth_dt
+from numberone a
+left join second b on a.user_id = b.user_id
+left join third c on a.user_id = c.user_id
+left join fourth d on a.user_id = d.user_id

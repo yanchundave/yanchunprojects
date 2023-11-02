@@ -28,6 +28,7 @@ relaunch_cohorts AS (
 ),
 
 -- a/b assignment
+-- After Aug 16 change to (EVENT_PROPERTIES) : "[Experiment] tivan-debit-optimization-collection-v4.variant" = 'control'
 ab_assign AS (
     SELECT
         user_id,
