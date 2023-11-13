@@ -1,3 +1,4 @@
+-----create or replace table sandbox.dev_yyang.sub2_lastsweep as
 with
 bank_connection AS (
 
@@ -117,6 +118,13 @@ paused_update as (
     SELECT *
     FROM paused_user
     WHERE unpaused_at > current_date()
+),
+deleted_user as (
+    select distinct user_id from APPLICATION_DB.TRANSACTIONS_DAVE.SUBSCRIPTION_BILLING
+    where _FIVETRAN_DELETED = TRUE
+    UNION
+    SELECT DISTINCT ID AS user_id FROM APPLICATION_DB.GOOGLE_CLOUD_MYSQL_DAVE.USER
+    where _FIVETRAN_DELETED = TRUE
 )
 select
 
@@ -138,6 +146,14 @@ select
     when e.user_id is not null then 1
     else 0
     end as if_paused,
+    case
+    when f.subscription_fee >0 and f.is_subscribed = TRUE then 0
+    else 1
+    end as if_user_paused,
+    case
+    when g.user_id is not null then 1
+    else 0
+    end as if_deleted,
     case
     when a.bill_due_date < dateadd('month', -3, current_date())
         then
@@ -161,6 +177,7 @@ left join mau d
 on a.user_id = d.user_id
 left join paused_update e
 on a.user_id = e.user_id
-join APPLICATION_DB.GOOGLE_CLOUD_MYSQL_DAVE.USER f
+left join APPLICATION_DB.GOOGLE_CLOUD_MYSQL_DAVE.USER f
 on a.user_id = f.id
-where f.subscription_fee > 0 and f.is_subscribed = TRUE
+left join deleted_user g
+on a.user_id = g.user_id

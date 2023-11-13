@@ -1,4 +1,4 @@
-CREATE OR REPLACE TABLE SANDBOX.DEV_YYANG.sub2_oct28 as
+CREATE OR REPLACE TABLE SANDBOX.DEV_YYANG.sub2_simple as
 with sub_new as (
     select * from DAVE.subscription.subscription sub
 ),
@@ -145,8 +145,8 @@ attempt_group_new as
 (
     select
         subscription_charge_id,
-        date(min(created)) as first_attempt_pt_dt,
-        date(max(created)) as last_attempt_dt,
+        date(min(CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', created))) as first_attempt_date,
+        date(max(CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', created))) as last_attempt_date,
         count(distinct subscription_attempt_id) as attempt_cnt
     from sub_attempts_new
     group by 1
@@ -166,8 +166,9 @@ sub2 as (
         iff(d.user_id is not null, 1, 0) as has_debit_card,
         iff(ag.subscription_charge_id is not null, 1, 0) as attempted_to_collect,
         iff(s.collect_status= 'collected', 1, 0) as is_collect_succeeded,
-        ag.first_attempt_pt_dt,
-        case when s.collect_status = 'collected' then ag.last_attempt_dt else null end as payment_pt_date,
+        ag.first_attempt_date,
+        ag.last_attempt_date,
+        case when s.collect_status = 'collected' then ag.last_attempt_date else null end as payment_pt_date,
         coalesce(ag.attempt_cnt, 0) as attempt_cnt,
         s.payment_method
     from sub_charge_new s
