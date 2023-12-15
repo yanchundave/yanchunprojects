@@ -90,7 +90,7 @@ payments AS (
         amount
     FROM subscription_payment
     WHERE payment_pt_dt >= '2020-01-01'
-        AND status in ('COMPLETED','PENDING') -- check if pending should be included
+        AND status in ('COMPLETED') -- check if pending should be included
         AND _FIVETRAN_DELETED = false
 ),
 

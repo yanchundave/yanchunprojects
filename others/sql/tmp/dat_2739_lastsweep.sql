@@ -1,4 +1,4 @@
------create or replace table sandbox.dev_yyang.sub2_lastsweep as
+--create or replace table sandbox.dev_yyang.sub2_lastsweep as
 with
 bank_connection AS (
 
@@ -46,7 +46,7 @@ user_bank_connection_healthiness AS (
     GROUP BY 1
 ),
 disconnected as (
-    select user_id from user_bank_connection_healthiness where user_bc_healthiness_score = 3
+    select distinct user_id from user_bank_connection_healthiness where user_bc_healthiness_score = 3
 ),
 unattempted as
 (
@@ -70,6 +70,7 @@ allusers as (
     left join subscriber_new b
     on a.user_id = b.user_id
     where b.user_id is null
+    qualify row_number() over (partition by a.user_id order by a.bill_due_date desc) = 1
 ),
 alluser_exclude_disconnect as
 (
@@ -93,7 +94,7 @@ attempted_oct as
 
 approval as
 (
-    select b.user_id, b.bill_due_date
+    select distinct b.user_id
     from analytic_db.dbt_marts.fct_advance_approvals a
     join unattempted b
     on a.user_id = b.user_id
@@ -115,16 +116,16 @@ paused_user as (
 ),
 
 paused_update as (
-    SELECT *
+    SELECT distinct user_id
     FROM paused_user
     WHERE unpaused_at > current_date()
 ),
 deleted_user as (
     select distinct user_id from APPLICATION_DB.TRANSACTIONS_DAVE.SUBSCRIPTION_BILLING
-    where _FIVETRAN_DELETED = TRUE
+    where _FIVETRAN_DELETED = TRUE or DELETED = TRUE
     UNION
     SELECT DISTINCT ID AS user_id FROM APPLICATION_DB.GOOGLE_CLOUD_MYSQL_DAVE.USER
-    where _FIVETRAN_DELETED = TRUE
+    where _FIVETRAN_DELETED = TRUE OR DELETED = TRUE
 )
 select
 
