@@ -1,0 +1,30 @@
+version: 2
+sources:
+- name: subscription
+  database: DAVE
+  schema: SUBSCRIPTION
+  tables:
+  - name: PAYMENT_METHOD_KIND
+    description: 'Auto-Generated using dbt-autodoc: https://github.com/dave-inc/dbt-autodoc
+      Owner: <OWNER> Slack Channel: <SLACK_CHANNEL>'
+    columns:
+    - name: CREATED
+      description: DESCRIPTION PENDING
+    - name: DELETED
+      description: DESCRIPTION PENDING
+    - name: ID
+      description: DESCRIPTION PENDING
+    - name: KIND
+      description: DESCRIPTION PENDING
+    - name: UPDATED
+      description: DESCRIPTION PENDING
+    - name: _SCHEMA_KEY
+      description: DESCRIPTION PENDING
+    - name: _CHANGE_TYPE
+      description: DESCRIPTION PENDING
+    - name: _DELETED
+      description: DESCRIPTION PENDING
+    - name: _READ_METHOD
+      description: DESCRIPTION PENDING
+    - name: _SOURCE_TIMESTAMP
+      description: DESCRIPTION PENDING

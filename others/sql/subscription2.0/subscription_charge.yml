@@ -1,0 +1,38 @@
+version: 2
+sources:
+- name: subscription
+  database: DAVE
+  schema: SUBSCRIPTION
+  tables:
+  - name: SUBSCRIPTION_CHARGE
+    description: 'Auto-Generated using dbt-autodoc: https://github.com/dave-inc/dbt-autodoc
+      Owner: <OWNER> Slack Channel: <SLACK_CHANNEL>'
+    columns:
+    - name: CURRENCY_CODE
+      description: DESCRIPTION PENDING
+    - name: ID
+      description: DESCRIPTION PENDING
+    - name: REFERENCE_ID
+      description: DESCRIPTION PENDING
+    - name: SUBSCRIPTION_CHARGE_STATUS_ID
+      description: DESCRIPTION PENDING
+    - name: SUBSCRIPTION_ID
+      description: DESCRIPTION PENDING
+    - name: TERM_ENDED
+      description: DESCRIPTION PENDING
+    - name: TERM_STARTED
+      description: DESCRIPTION PENDING
+    - name: UNIT_COST
+      description: DESCRIPTION PENDING
+    - name: _CHANGE_TYPE
+      description: DESCRIPTION PENDING
+    - name: _DELETED
+      description: DESCRIPTION PENDING
+    - name: _READ_METHOD
+      description: DESCRIPTION PENDING
+    - name: _SOURCE_TIMESTAMP
+      description: DESCRIPTION PENDING
+    - name: CHARGED_PAYMENT_METHOD_ID
+      description: DESCRIPTION PENDING
+    - name: PAYMENT_METHOD_KIND_ID
+      description: DESCRIPTION PENDING

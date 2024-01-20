@@ -1,0 +1,48 @@
+version: 2
+sources:
+- name: subscription
+  database: DAVE
+  schema: SUBSCRIPTION
+  tables:
+  - name: SUBSCRIPTION_CHARGE_ATTEMPT
+    description: 'Auto-Generated using dbt-autodoc: https://github.com/dave-inc/dbt-autodoc
+      Owner: <OWNER> Slack Channel: <SLACK_CHANNEL>'
+    columns:
+    - name: CREATED
+      description: DESCRIPTION PENDING
+    - name: DELETED
+      description: DESCRIPTION PENDING
+    - name: ID
+      description: DESCRIPTION PENDING
+    - name: SUBSCRIPTION_CHARGE_ID
+      description: DESCRIPTION PENDING
+    - name: UPDATED
+      description: DESCRIPTION PENDING
+    - name: _CHANGE_TYPE
+      description: DESCRIPTION PENDING
+    - name: _DELETED
+      description: DESCRIPTION PENDING
+    - name: _READ_METHOD
+      description: DESCRIPTION PENDING
+    - name: _SOURCE_TIMESTAMP
+      description: DESCRIPTION PENDING
+    - name: REFERENCE_ID
+      description: DESCRIPTION PENDING
+    - name: PAYMENT_METHOD_KIND_ID
+      description: DESCRIPTION PENDING
+    - name: CHARGE_TRIGGER
+      description: DESCRIPTION PENDING
+    - name: COLLECTION_STRATEGY
+      description: DESCRIPTION PENDING
+    - name: COMPLETED_AT
+      description: DESCRIPTION PENDING
+    - name: EXTERNAL_ACCOUNT_BALANCE_OUTCOME
+      description: DESCRIPTION PENDING
+    - name: FAILED_AT
+      description: DESCRIPTION PENDING
+    - name: FAILURE_REASON
+      description: DESCRIPTION PENDING
+    - name: RETURNED_AT
+      description: DESCRIPTION PENDING
+    - name: SCHEDULED_FOR
+      description: DESCRIPTION PENDING

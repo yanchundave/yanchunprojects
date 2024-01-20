@@ -1,6 +1,6 @@
 with new_mtm as (
-    SELECT user_id, min(date_trunc('month', TRANSACTING_TS_PST)) as earliest_mtm_date
-    FROM ANALYTIC_DB.DBT_metrics.one_dave_transacting_users GROUP BY 1
+    SELECT user_id, type_code, min(date_trunc('month', TRANSACTING_TS_PST)) as earliest_mtm_date
+    FROM ANALYTIC_DB.DBT_metrics.one_dave_transacting_users GROUP BY 1, 2
 ),
 sub_user as (
     select user_id, billing_cycle from ANALYTIC_DB.DBT_MARTS.FCT_MONTHLY_SUBSCRIPTION_USERS
@@ -18,6 +18,7 @@ subscription_users as
 )
 select
     a.user_id,
+    a.type_code,
     a.earliest_mtm_date,
     case
     when b.user_id is not null then 1
