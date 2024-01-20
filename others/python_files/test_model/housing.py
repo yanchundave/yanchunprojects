@@ -5,7 +5,7 @@ from sklearn.linear_model import LinearRegression
 import pickle
 
 def main():
-    df = pd.read_csv("/Users/yanchunyang/Documents/training/datasets/housing.csv")
+    df = pd.read_csv("housing.csv")
     df.columns = ['income', 'age', 'rooms', 'bedrooms', 'population', 'price', 'address']
     dfupdate = df.loc[:, ['income', 'age', 'rooms', 'bedrooms', 'population', 'price']]
     lin_reg = LinearRegression()
