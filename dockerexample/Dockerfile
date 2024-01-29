@@ -1,11 +1,11 @@
-FROM python:3.10
+FROM python:3.10.11
 
 WORKDIR /app
 
-COPY ./requirements.txt requirements.txt
+COPY . /app
+
 RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
-COPY ./*.py .
-COPY ./model.p .
+EXPOSE 5000
 
-CMD ["python", "/app.py"]
+CMD ["python", "app.py"]
