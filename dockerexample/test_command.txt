@@ -1,0 +1,1 @@
+curl -H "Content-Type: application/json" -X POST 104.197.215.69:5000/predict -d '{"income":79545.45857,"age":5.682861322,"rooms":7.009188143,"bedrooms":4.09,"population":23086.8005}'
