@@ -10,13 +10,13 @@ SNOWFLAKE_WAREHOUSE = os.environ.get("SNOWFLAKE_WAREHOUSE")
 SNOWFLAKE_ROLE = os.environ.get("SNOWFLAKE_ROLE")
 
 con = ds.snowflake_connect(warehouse=SNOWFLAKE_WAREHOUSE, role=SNOWFLAKE_ROLE)
-con_write = ds.snowflake_connect(warehouse="DAVE_WH", role="DAVE_DATA_DEV")
+con_write = ds.snowflake_connect(warehouse=SNOWFLAKE_WAREHOUSE, role=SNOWFLAKE_ROLE)
 
 
 def read_train_data():
     sql_str = """
     SELECT *
-    FROM ANALYTIC_DB.DBT_METRICS.LTV_SHORT_INPUT
+    FROM sandbox.DEV_YYANG_DBT_metrics.LTV_SHORT_INPUT
     WHERE FORECASTDATE < DATE_TRUNC('month', CURRENT_DATE())
     AND FIRST_TRANS IS NOT NULL
     AND (FREQUENCY = 0 OR (FREQUENCY > 0 AND RECENCY > 0))
@@ -28,7 +28,7 @@ def read_train_data():
 def read_forecast_data():
     sql_str = """
     SELECT *
-    FROM ANALYTIC_DB.DBT_METRICS.LTV_SHORT_INPUT
+    FROM sandbox.DEV_YYANG_DBT_metrics.LTV_SHORT_INPUT
     WHERE FORECASTDATE = DATE_TRUNC('month', CURRENT_DATE())
     AND FIRST_TRANS IS NOT NULL
     AND (FREQUENCY = 0 OR (FREQUENCY > 0 AND RECENCY > 0))
@@ -98,7 +98,7 @@ def main():
 
     ds.write_snowflake_table(
         dfcombine,
-        "ANALYTIC_DB.MODEL_OUTPUT.ltvshort_forecast_result",
+        "SANDBOX.DEV_YYANG.ltvshort_forecast_result",
         con_write,
         mode="create",
     )
