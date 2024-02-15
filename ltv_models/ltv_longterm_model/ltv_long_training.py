@@ -106,7 +106,7 @@ def main():
         mode="create",
     )
 
-    log.infor(dfforecastupdate.shape)
+    log.info(dfforecastupdate.shape)
 
 
 if __name__ == "__main__":

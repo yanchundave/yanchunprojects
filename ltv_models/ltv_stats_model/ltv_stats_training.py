@@ -9,7 +9,7 @@ SNOWFLAKE_WAREHOUSE = os.environ.get("SNOWFLAKE_WAREHOUSE")
 SNOWFLAKE_ROLE = os.environ.get("SNOWFLAKE_ROLE")
 
 con = ds.snowflake_connect(warehouse=SNOWFLAKE_WAREHOUSE, role=SNOWFLAKE_ROLE)
-con_write = ds.snowflake_connect(warehouse="DAVE_WH", role="DAVE_DATA_DEV")
+con_write = ds.snowflake_connect(warehouse=SNOWFLAKE_WAREHOUSE, role=SNOWFLAKE_ROLE)
 
 
 def read_train_data():
