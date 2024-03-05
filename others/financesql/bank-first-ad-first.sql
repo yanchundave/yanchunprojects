@@ -48,3 +48,26 @@ subfee as (
     left join ANALYTIC_DB.DBT_metrics.one_dave_new_members b
     on a.user_id = b.user_id
     group by 1
+
+    -----
+
+--bank-first or advance-first
+
+ with users_list as (
+    select
+    distinct user_id
+    from ANALYTIC_DB.DBT_metrics.one_dave_transacting_users
+    where transacting_ds_pst >= date('2022-03-01') and transacting_ds_pst < date('2022-11-01')
+    union
+    select
+    distinct user_id
+    from ANALYTIC_DB.DBT_metrics.one_dave_new_members
+    where event_ds >= date('2022-03-01') and event_ds < date('2022-11-01')
+    )
+    select
+    b.new_member_category,
+    count(distinct a.user_id)
+    from users_list a
+    left join ANALYTIC_DB.DBT_metrics.one_dave_new_members b
+    on a.user_id = b.user_id
+    group by 1
