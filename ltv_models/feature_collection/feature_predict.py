@@ -13,13 +13,11 @@ def main(session: snowpark.Session):
         Y = np.array([float(x) for x in row['REVLIST'].strip().split(',')])
         print(X)
         if len(X) == 0 or len(X) == 1:
-            return 0, 0, 1, 1
+            return 0, 0
 
         trending_ratio = np.sum((X-np.mean(X))*(Y-np.mean(Y)))/(np.sum(np.square(X-np.mean(X))) + 0.001)
         intercept = np.mean(Y) - trending_ratio * np.mean(X)
-        disburstdate_std = np.std(X)
-        rev_std = np.std(Y)
-        return trending_ratio, intercept,disburstdate_std, rev_std
+        return trending_ratio, intercept
 
     dateset = [
         '2024-02-01',
@@ -29,6 +27,7 @@ def main(session: snowpark.Session):
     query_str = """
     With
     -- For calculating the approved_bank_count
+
     FCT_ADVANCE_APPROVALS AS
     (
         SELECT * FROM ANALYTIC_DB.DBT_marts.fct_advance_approvals
@@ -73,7 +72,7 @@ def main(session: snowpark.Session):
                 distinct user_id
             from settlements
             where last_payment_date is not null and date(last_payment_date) >= dateadd('month', -6,  date(?)) AND date(last_payment_date) < date(?)
-        ) sample (3000 rows)
+        ) sample (200000 rows)
     ),
     --select * from users_candidate
 
@@ -101,6 +100,7 @@ def main(session: snowpark.Session):
             nur.network,
             nur.bod_account_open_user,
             nur.bod_direct_deposit_user,
+            date(nur.pv_ts) as pv_date,
             bc.bank_category,
             bc.has_valid_credentials,
             ab.approved_bank_count
@@ -120,7 +120,7 @@ def main(session: snowpark.Session):
             ds.disbursement_ds_pst,
             ss.total_settled_amount,
             ss.total_settled_amount - ss.principal as net_rev,
-            datediff('day', date(ds.disbursement_ds_pst), date(?)) as datediff,
+            datediff('day', bf.pv_date, date(ds.disbursement_ds_pst)) as datediff,
             case
             when ss.settlement_due_ds_pst > date(?) then 1
             else 0
@@ -137,8 +137,10 @@ def main(session: snowpark.Session):
         from users_candidate uc
         join disbursements ds
         on uc.user_id = ds.user_id
-        join settlements ss
+        left join settlements ss
         on ds.advance_id = ss.advance_id
+        left join bank_feature bf
+        on uc.user_id = bf.user_id
         where ds.disbursement_ds_pst <= date(?)
         order by uc.user_id, ds.disbursement_ds_pst
     ),
@@ -172,7 +174,9 @@ def main(session: snowpark.Session):
             max(not_fully_baked) as not_baked,
             max(net_rev) as max_rev,
             max(principal) as max_principle,
-            stddev(settlement_dis) as settlement_dev,
+            stddev(settlement_dis) as settlement_date_dev,
+            stddev(datediff) as disburse_date_dev,
+            stddev(net_rev) as net_rev_dev,
             array_to_string(array_agg(datediff), ',') as monthlist,
             array_to_string(array_agg(net_rev), ',') as revlist
         from uc_trans
@@ -229,7 +233,9 @@ def main(session: snowpark.Session):
             coalesce(rmf.max_rev, 0) as max_rev,
             coalesce(rmf.max_principle, 0) as max_principle,
             coalesce(rmf.not_baked, 0) as not_baked,
-            coalesce(rmf.settlement_dev, 0) as settlement_dev,
+            coalesce(rmf.settlement_date_dev, 0) as settlement_date_dev,
+            coalesce(rmf.disburse_date_dev, 0) as disburse_date_dev,
+            coalesce(rmf.net_rev_dev, 0) as net_rev_dev,
             rmf.monthlist,
             rmf.revlist,
             coalesce(lt.settled_rate, 0) as settled_rate,
@@ -265,7 +271,7 @@ def main(session: snowpark.Session):
     dflist = []
     for datepar in dateset:
         df = session.sql(query_str,
-                         params=[datepar, datepar,datepar,datepar,datepar,datepar,datepar,datepar,datepar,datepar, datepar, datepar, datepar, datepar])
+                         params=[datepar, datepar,datepar,datepar,datepar,datepar,datepar,datepar,datepar,datepar, datepar, datepar, datepar])
         dflist.append(df)
     dfsnow = dflist[0]
     df_combine = dfsnow.to_pandas()
