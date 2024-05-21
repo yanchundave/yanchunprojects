@@ -1,0 +1,16 @@
+version: 2
+
+models:
+- name: ltv_transaction
+  description: Base table for LTV input tables which contains the users transaction information
+  columns:
+    - name: TRANS_ID
+      description: DESCRIPTION PENDING
+    - name: USER_ID
+      description: DESCRIPTION PENDING
+    - name: STARTDATE
+      description: DESCRIPTION PENDING
+    - name: TRANS_TIME
+      description: DESCRIPTION PENDING
+    - name: REVENUE
+      description: DESCRIPTION PENDING
