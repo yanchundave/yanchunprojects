@@ -37,8 +37,8 @@ ec_final AS ( -- join with state_info, and filter on 1. only not fully paid adva
     ec_payment.total_settlement,
     datediff(day, '{{report_date}}', original_payback_date) AS DPD,
     (coll.total_due - IFNULL(ec_payment.total_settlement, 0)) AS remaining_balance,
-    IFF(remaining_balance <= (coll.tip_amount + coll.express_fee + coll.service_fee_amount),
-      remaining_balance,
+    IFF(remaining_balance <= (coll.tip_amount + coll.express_fee + coll.service_fee_amount), 
+      remaining_balance, 
       (coll.tip_amount + coll.express_fee + coll.service_fee_amount)) AS tip_receivables,
     datediff(day, original_payback_date, coll.created_date) AS diff_advance_payback_date,
     'extra_cash' AS credit_type
@@ -132,25 +132,22 @@ SELECT
   user_id,
   advance_id,
   credit_type AS product,
-
-  IFF(diff_advance_payback_date < -30 AND DPD > -15 AND advance_principal <= 600, remaining_balance - tip_receivables, 0) AS "Advances in Excess of Term Criteria",
-  IFF(advance_principal > 600 AND DPD > -15, remaining_balance - tip_receivables, 0) AS "Advances in Excess of Size 600",
-  IFF(advance_principal > 100 AND diff_advance_payback_date > -30 AND DPD > -15, remaining_balance - tip_receivables, 0) AS "Eligible Receivables with Advances > 100",
-
-  IFF(DPD <= -15, remaining_balance - tip_receivables, 0) AS "Gross Advances - 15 Days or More Delinquent-Past-Due-Date",
-  IFF(DPD > -15, remaining_balance - tip_receivables, 0) AS "Gross Advances - 14 Days or Less Delinquent-Past-Due-Date",
-  IFF(DPD > -15 AND DPD < 0 AND advance_principal<=600 AND diff_advance_payback_date >= -30, remaining_balance-tip_receivables, 0) AS "1-14 DPD - Excess Concentration Limits",
-  IFF(DPD >= 0 AND advance_principal <= 600 AND diff_advance_payback_date >= -30, remaining_balance-tip_receivables, 0) AS "Current - Excess Concentration Limits",
-
-  IFF(advance_principal >= 25, 'Big Money', 'Tiny Money') AS "advance_type",
-  remaining_balance AS "receivable_outstanding",
-  tip_receivables AS "tip_fee_receivable",
-
+  created_date AS advance_creation_date,
+  original_payback_date,
+  datediff('day', original_payback_date, advance_creation_date) AS advance_term,
+  DPD AS latest_days_past_due,
+  remaining_balance AS gross_receivable_outstanding_with_tipfee,
+  tip_amount + fee AS tip_fee,
+  gross_receivable_outstanding_with_tipfee - tip_fee AS gross_receivable_outstanding_principle,
+  IFF(DPD <= -15, remaining_balance - tip_receivables, 0) AS principle_more_15_DPD,
+  gross_receivable_outstanding_principle - principle_more_15_DPD AS  gross_advances_14_DPD,
+  IFF(advance_principal > 600 AND DPD > -15, remaining_balance - tip_receivables, 0) AS advance_in_excess_600,
+  IFF(diff_advance_payback_date < -30 AND DPD > -15 AND advance_principal <= 600, remaining_balance - tip_receivables, 0) AS advance_in_excess_term,
   IFF((multi_advance_outstanding = 1 OR payback_date_modified = 1)
       AND diff_advance_payback_date >= -30
       AND advance_principal <= 600
-      AND DPD > -15, remaining_balance - tip_receivables, 0) AS "additional_ineligible_advances",
-
+      AND DPD > -15, remaining_balance - tip_receivables, 0) AS additional_ineligible_advances,
+  gross_advances_14_DPD - advance_in_excess_600 - advance_in_excess_term - additional_ineligible_advances AS gross_eligible_receivable
   IFF(DPD > -15
       AND advance_principal <= 600
       AND multi_advance_outstanding !=1
