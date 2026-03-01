@@ -10,3 +10,9 @@ venv/
 
 # Ignore csv file
 *.csv
+
+# Ignore pycache
+__pycache__/
+
+# Ignore credentials
+profiles.yml
